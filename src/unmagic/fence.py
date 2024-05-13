@@ -1,4 +1,5 @@
 import dataclasses
+import warnings
 from contextlib import contextmanager
 
 from _pytest import fixtures as pytest_fixtures
@@ -11,8 +12,8 @@ _fences = [set()]
 def install(names=(), reset=False):
     """Install unmagic fixture fence
 
-    Prevent pytest's standard magical fixtures from being defined and
-    referenced with the named packages and modules.
+    Warn if pytest magic fixtures are used within the named
+    modules/packages.
     """
     if isinstance(names, str):
         raise ValueError("names should be a sequence of strings, not a string")
@@ -27,6 +28,28 @@ def install(names=(), reset=False):
     if not hasattr(fenced_fixture, "_original"):
         fenced_fixture._original = original
     return _uninstall(_fences[-1])
+
+
+def pytest_runtest_call(item):
+    if _has_magic_fixtures(item.obj, item._fixtureinfo.argnames, item):
+        names = ", ".join(item._fixtureinfo.argnames)
+        warnings.warn(f"{item._nodeid} used magic fixture(s): {names}")
+
+
+def pytest_fixture_setup(fixturedef):
+    if is_fenced(fixturedef.func) and fixturedef.argnames:
+        fixtureid = f"{fixturedef.baseid}::{fixturedef.argname}"
+        names = ", ".join(fixturedef.argnames)
+        warnings.warn(f"{fixtureid} used magic fixture(s): {names}")
+
+
+def _has_magic_fixtures(obj, argnames, node):
+    if not (is_fenced(obj) and argnames):
+        return False
+    args = set(argnames) - pytest_fixtures._get_direct_parametrize_args(node)
+    if getattr(obj, "discard_magic_request", False):
+        args.discard("request")
+    return args
 
 
 @contextmanager
