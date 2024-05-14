@@ -2,7 +2,7 @@ from contextlib import contextmanager
 
 import pytest
 
-from unmagic import fixture, use
+from unmagic import fence, fixture, use
 
 
 @fixture
@@ -49,3 +49,7 @@ def test_plain_contextmanager_fixture(context_traces, traces):
     # NOTE fixture values of plain context managers are not cached and
     # shared with tests and their fixtures.
     assert context_traces is not traces
+
+
+def test_module_is_fenced():
+    assert fence.is_fenced(test_module_is_fenced)
