@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 
 import pytest
+from _pytest.capture import capsys
 
 from unmagic import fence, fixture, use
 
@@ -62,3 +63,10 @@ def test_plain_contextmanager_fixture(context_traces, traces, other):
 
 def test_module_is_fenced():
     assert fence.is_fenced(test_module_is_fenced)
+
+
+@use(capsys)
+def test_use_magic_fixture(cap):
+    print("hello")
+    captured = cap.readouterr()
+    assert captured.out == "hello\n"

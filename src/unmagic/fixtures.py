@@ -4,11 +4,12 @@ Unmagical fixtures make it obvious where a fixture comes from using
 standard Python import semantics.
 """
 from collections import defaultdict, namedtuple
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager, nullcontext
 from functools import wraps
 from inspect import Parameter, signature
 
 import pytest
+from _pytest.fixtures import getfixturemarker
 
 __all__ = ["fixture", "use"]
 
@@ -115,6 +116,8 @@ class Cache:
     def make_context(self, fixture):
         if getattr(fixture, "has_unmagic_fixtures", False):
             return fixture(request=self.request)
+        if getfixturemarker(fixture) is not None:
+            return nullcontext(self.request.getfixturevalue(fixture.__name__))
         return fixture()
 
 
