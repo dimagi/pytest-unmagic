@@ -8,7 +8,7 @@ from .util import get_source
 pytest_plugins = ["pytester"]
 
 
-@fixture(scope="module")
+@fixture(scope="module", autouse=True)
 def unfenced():
     with fence.install(reset=True):
         yield
@@ -24,7 +24,7 @@ def test_fence():
 
 
 def test_fence_is_removed_on_exit_context():
-    assert not fence.is_fenced(func)
+    assert not fence.is_fenced(func), fence._fences
     with fence.install([__name__]):
         assert fence.is_fenced(func)
     assert not fence.is_fenced(func)
