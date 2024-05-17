@@ -70,3 +70,23 @@ def test_use_magic_fixture(cap):
     print("hello")
     captured = cap.readouterr()
     assert captured.out == "hello\n"
+
+
+@fixture
+def broken_fix():
+    return "nope"
+
+
+def test_malformed_unmagic_fixture(request):
+    @use(broken_fix)
+    def test(value):
+        assert 0, "should not get here"
+
+    with pytest.raises(TypeError, match="fixture 'broken_fix' does not yield"):
+        test(request=request)
+
+
+def test_malformed_unmagic_fixture_as_context_manager():
+    with pytest.raises(TypeError, match="fixture 'broken_fix' does not yield"):
+        with broken_fix():
+            assert 0, "should not get here"

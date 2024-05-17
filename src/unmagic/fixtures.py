@@ -7,6 +7,7 @@ from collections import defaultdict, namedtuple
 from contextlib import ExitStack, contextmanager, nullcontext
 from functools import wraps
 from inspect import Parameter, signature
+from types import GeneratorType
 
 import pytest
 from _pytest.fixtures import getfixturemarker
@@ -25,7 +26,7 @@ def fixture(func=None, /, scope="function"):
         func.is_unmagic_fixture = True
         func.scope = scope
         func.__test__ = False
-        return contextmanager(func)
+        return contextmanager(validate_generator(func))
     return fixture if func is None else fixture(func)
 
 
@@ -130,3 +131,13 @@ def get_scope_data(request):
 _stash_key = pytest.StashKey()
 _exit_key = object()
 Result = namedtuple("Result", ["value", "exc"])
+
+
+def validate_generator(func):
+    @wraps(func)
+    def validate(*args, **kw):
+        gen = func(*args, **kw)
+        if not isinstance(gen, GeneratorType):
+            raise TypeError(f"fixture {func.__name__!r} does not yield")
+        return gen
+    return validate
