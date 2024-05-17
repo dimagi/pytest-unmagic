@@ -40,8 +40,7 @@ def _has_magic_fixtures(obj, argnames, node):
     if not (is_fenced(obj) and argnames):
         return False
     args = set(argnames) - pytest_fixtures._get_direct_parametrize_args(node)
-    if getattr(obj, "discard_magic_request", False):
-        args.discard("request")
+    args.discard("request")
     return args
 
 

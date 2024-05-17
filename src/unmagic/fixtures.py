@@ -52,10 +52,8 @@ def use(*fixtures):
         run_with_fixtures.has_unmagic_fixtures = True
         sig = signature(func)
         new_params = list(sig.parameters.values())[len(fixtures):]
-        if any(p.name == "request" for p in new_params):
-            discard = False
-        else:
-            discard = run_with_fixtures.discard_magic_request = True
+        discard = not any(p.name == "request" for p in new_params)
+        if discard:
             new_params.append(Parameter("request", Parameter.KEYWORD_ONLY))
         run_with_fixtures.__signature__ = sig.replace(parameters=new_params)
         return run_with_fixtures
