@@ -40,6 +40,11 @@ def test_unmagic_fixture_as_context_manager():
         assert traces == []
 
 
+@use(tracer, check_done)
+def test_unmagic_fixture_with_more_fixtures_than_args(traces):
+    traces.append("done")
+
+
 @pytest.mark.parametrize("p1, p2", [(1, 2), (2, 3)])
 @use(tracer, check_done)
 def test_params(traces, _, p1, p2):

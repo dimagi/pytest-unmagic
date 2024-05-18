@@ -3,6 +3,7 @@
 Unmagical fixtures make it obvious where a fixture comes from using
 standard Python import semantics.
 """
+import sys
 from collections import defaultdict, namedtuple
 from contextlib import ExitStack, contextmanager, nullcontext
 from functools import wraps
@@ -53,17 +54,26 @@ def use(*fixtures):
                 # retain self as first argument
                 fixture_args.insert(0, args[0])
                 args = args[1:]
+            if len(fixtures) > num_params:
+                fixture_args = fixture_args[:num_params]
             return func(*fixture_args, *args, **kw)
 
         run_with_fixtures.has_unmagic_fixtures = True
         sig = signature(func)
         new_params = list(sig.parameters.values())[len(fixtures):]
+        num_params = sum(_N_PARAMS(p.kind, 0) for p in sig.parameters.values())
         discard = not any(p.name == "request" for p in new_params)
         if discard:
             new_params.append(Parameter("request", Parameter.KEYWORD_ONLY))
         run_with_fixtures.__signature__ = sig.replace(parameters=new_params)
         return run_with_fixtures
     return apply_fixtures
+
+
+_N_PARAMS = {
+    Parameter.POSITIONAL_ONLY: 1,
+    Parameter.POSITIONAL_OR_KEYWORD: 1,
+}.get
 
 
 class Cache:
