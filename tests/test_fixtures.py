@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import pytest
 from _pytest._code import Source
 from _pytest.capture import capsys
+from _pytest.outcomes import Failed
 
 from unmagic import fence, fixture, use
 
@@ -90,7 +91,7 @@ def test_malformed_unmagic_fixture(request):
     def test(value):
         assert 0, "should not get here"
 
-    with pytest.raises(TypeError, match="fixture 'broken_fix' does not yield"):
+    with pytest.raises(Failed, match="fixture 'broken_fix' does not yield"):
         test(request=request)
 
 

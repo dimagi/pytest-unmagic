@@ -47,15 +47,19 @@ def use(*fixtures):
     def apply_fixtures(func):
         @wraps(func)
         def run_with_fixtures(*args, **kw):
-            request = kw.pop("request") if discard else kw["request"]
-            cache = Cache(request, get_scope_data(request))
-            fixture_args = [cache.get(f) for f in fixtures]
-            if args and ismethod(request.function):
-                # retain self as first argument
-                fixture_args.insert(0, args[0])
-                args = args[1:]
-            if len(fixtures) > num_params:
-                fixture_args = fixture_args[:num_params]
+            try:
+                request = kw.pop("request") if discard else kw["request"]
+                cache = Cache(request, get_scope_data(request))
+                fixture_args = [cache.get(f) for f in fixtures]
+                if args and ismethod(request.function):
+                    # retain self as first argument
+                    fixture_args.insert(0, args[0])
+                    args = args[1:]
+                if len(fixtures) > num_params:
+                    fixture_args = fixture_args[:num_params]
+            except Exception as exc:
+                pytest.fail(f"fixture setup for {func.__name__!r} failed: "
+                            f"{type(exc).__name__}: {exc}")
             return func(*fixture_args, *args, **kw)
 
         run_with_fixtures.has_unmagic_fixtures = True
