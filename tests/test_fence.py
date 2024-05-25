@@ -5,8 +5,6 @@ from unmagic import fence
 
 from .util import get_source
 
-pytest_plugins = ["pytester"]
-
 
 @fixture(scope="module", autouse=True)
 def unfenced():

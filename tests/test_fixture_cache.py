@@ -1,23 +1,16 @@
 from collections import defaultdict
-from contextlib import contextmanager, closing
+from contextlib import contextmanager
 
-from unmagic.fixtures import Cache, fixture, use
-
-
-@fixture
-def make_cache():
-    request = FakeRequest()
-    with closing(request):
-        yield Cache(request, defaultdict(dict))
+from unmagic.fixtures import Cache, fixture
 
 
-@use(make_cache)
-def test_execute_value(cache):
+def test_execute_value():
     @fixture
     def fix():
         yield value
 
     value = object()
+    cache = Cache(defaultdict(dict))
     fkey = cache.get_fixture_key(fix)
     skey = cache.get_scope_key(fix)
 
@@ -26,12 +19,12 @@ def test_execute_value(cache):
     assert result.exc is None
 
 
-@use(make_cache)
-def test_execute_error(cache):
+def test_execute_error():
     @fixture
     def fix():
         raise Error
 
+    cache = Cache(defaultdict(dict))
     fkey = cache.get_fixture_key(fix)
     skey = cache.get_scope_key(fix)
 
@@ -46,7 +39,7 @@ class TestScopeKeys:
         @fixture
         def fix():
             yield
-        cache = Cache(None, None)
+        cache = Cache(None)
 
         assert cache.get_scope_key(fix) == "function"
 
@@ -54,7 +47,7 @@ class TestScopeKeys:
         @contextmanager
         def fix():
             yield
-        cache = Cache(None, None)
+        cache = Cache(None)
 
         assert cache.get_scope_key(fix) == "function"
 
@@ -62,23 +55,9 @@ class TestScopeKeys:
         @fixture(scope="class")
         def fix():
             yield
-        cache = Cache(None, None)
+        cache = Cache(None)
 
         assert cache.get_scope_key(fix) == "class"
-
-
-class FakeRequest:
-
-    @property
-    def node(self):
-        return self
-
-    def getparent(self, node_type):
-        return self
-
-    def addfinalizer(self, fin):
-        assert not hasattr(self, "close")
-        self.close = fin
 
 
 class Error(Exception):

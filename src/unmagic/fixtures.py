@@ -3,16 +3,16 @@
 Unmagical fixtures make it obvious where a fixture comes from using
 standard Python import semantics.
 """
-import sys
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from contextlib import ExitStack, contextmanager, nullcontext
 from functools import wraps
 from inspect import Parameter, ismethod, signature
 from types import GeneratorType
 
 import pytest
-from _pytest.fixtures import get_scope_node, getfixturemarker
-from _pytest.scope import Scope
+from _pytest.fixtures import getfixturemarker
+
+from .scope import get_active, get_addfinalizer, get_scope_data
 
 __all__ = ["fixture", "use"]
 
@@ -23,6 +23,18 @@ def fixture(func=None, /, scope="function"):
     Applies ``contextlib.contextmanager`` to the decorated function.
     Decorated functions will not be run as tests, regardless of their
     name.
+
+    Fixtures can be assigned a scope. Scoped fixtures are setup
+    immediately before the first test that uses them. Teardown occurs
+    after all tests in the scope have been run.
+
+    To have a fixture automatically applied to all tests in a scope,
+    `@use` decorators may be applied to the corresponding setup
+    function. For example, a module-scoped fixture can be applied to all
+    tests in a given module by applying it to a function named
+    `setup_module` in the module. As another example, a function-scoped
+    fixture may be applied to every function in a module by applying it
+    to `setup_function` in the module.
     """
     def fixture(func):
         func.is_unmagic_fixture = True
@@ -30,6 +42,24 @@ def fixture(func=None, /, scope="function"):
         func.__test__ = False
         return contextmanager(validate_generator(func))
     return fixture if func is None else fixture(func)
+
+
+def get_fixture_value(name):
+    """Get magic fixture value
+
+    The fixture will be set up if necessary, and will be torn down
+    at the end of its scope.
+
+    The 'unmagic' plugin must be active for this to work.
+    """
+    if not isinstance(name, str):
+        raise ValueError("magic fixture name must be a string")
+    requests = get_active().requests
+    if not requests:
+        raise ValueError("There is no active pytest request")
+    if name == "request":
+        return requests[-1]
+    return requests[-1].getfixturevalue(name)
 
 
 def use(*fixtures):
@@ -48,14 +78,14 @@ def use(*fixtures):
         @wraps(func)
         def run_with_fixtures(*args, **kw):
             try:
-                request = kw.pop("request") if discard else kw["request"]
-                cache = Cache(request, get_scope_data(request))
+                request = get_fixture_value("request")
+                cache = Cache(get_scope_data())
                 fixture_args = [cache.get(f) for f in fixtures]
                 if args and ismethod(request.function):
                     # retain self as first argument
                     fixture_args.insert(0, args[0])
                     args = args[1:]
-                if len(fixtures) > num_params:
+                if len(fixture_args) > num_params:
                     fixture_args = fixture_args[:num_params]
             except Exception as exc:
                 pytest.fail(f"fixture setup for {func.__name__!r} failed: "
@@ -66,9 +96,6 @@ def use(*fixtures):
         sig = signature(func)
         new_params = list(sig.parameters.values())[len(fixtures):]
         num_params = sum(_N_PARAMS(p.kind, 0) for p in sig.parameters.values())
-        discard = not any(p.name == "request" for p in new_params)
-        if discard:
-            new_params.append(Parameter("request", Parameter.KEYWORD_ONLY))
         run_with_fixtures.__signature__ = sig.replace(parameters=new_params)
         return run_with_fixtures
     return apply_fixtures
@@ -83,29 +110,28 @@ _N_PARAMS = {
 class Cache:
     """Fixture value cache"""
 
-    def __init__(self, request, scopes):
-        self.request = request
-        self.scopes = scopes
+    def __init__(self, scope_data):
+        self.scope_data = scope_data
 
     def get(self, fixture):
         scope_key = self.get_scope_key(fixture)
         fixture_key = self.get_fixture_key(fixture)
-        result = self.scopes[scope_key].get(fixture_key)
+        result = self.scope_data[scope_key].get(fixture_key)
         if result is None:
             result = self.execute(fixture, fixture_key, scope_key)
-            self.scopes[scope_key][fixture_key] = result
+            self.scope_data[scope_key][fixture_key] = result
         if result.exc is not None:
             raise result.exc
         return result.value
 
     def execute(self, fixture, fixture_key, scope_key):
-        values = self.scopes[scope_key]
+        values = self.scope_data[scope_key]
         assert fixture_key not in values
         exit = values.get(_exit_key)
         if exit is None:
-            on_exit_scope = self.get_scope_finalizer(scope_key)
+            on_exit_scope = get_addfinalizer(scope_key)
             exit = values[_exit_key] = ExitStack()
-            exit.callback(self.scopes.pop, scope_key)
+            exit.callback(self.scope_data.pop, scope_key)
             on_exit_scope(exit.close)
         try:
             value = exit.enter_context(self.make_context(fixture))
@@ -122,31 +148,12 @@ class Cache:
     def get_fixture_key(fixture):
         return fixture
 
-    def get_scope_finalizer(self, scope_key):
-        node = self.get_scope_node(scope_key)
-        return node.addfinalizer
-
-    def get_scope_node(self, scope):
-        scope_enum = Scope.from_user(scope, "unmagic fixture cache")
-        return get_scope_node(self.request.node, scope_enum)
-
     def make_context(self, fixture):
-        if getattr(fixture, "has_unmagic_fixtures", False):
-            return fixture(request=self.request)
         if getfixturemarker(fixture) is not None:
-            return nullcontext(self.request.getfixturevalue(fixture.__name__))
+            return nullcontext(get_fixture_value(fixture.__name__))
         return fixture()
 
 
-def get_scope_data(request):
-    stash = request.config.stash
-    value = stash.get(_stash_key, None)
-    if value is None:
-        value = stash[_stash_key] = defaultdict(dict)
-    return value
-
-
-_stash_key = pytest.StashKey()
 _exit_key = object()
 Result = namedtuple("Result", ["value", "exc"])
 
