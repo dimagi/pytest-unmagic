@@ -1,9 +1,12 @@
 from contextlib import contextmanager
 
 import pytest
+from _pytest._code import Source
 from _pytest.capture import capsys
 
 from unmagic import fence, fixture, use
+
+from .util import get_source
 
 
 @fixture
@@ -90,3 +93,120 @@ def test_malformed_unmagic_fixture_as_context_manager():
     with pytest.raises(TypeError, match="fixture 'broken_fix' does not yield"):
         with broken_fix():
             assert 0, "should not get here"
+
+
+def test_class_and_session_scope(request):
+    @get_source
+    def test_py():
+        from unmagic import fixture, use
+
+        @fixture(scope="session")
+        def ss_tracer():
+            traces = []
+            yield traces
+            print("", " ".join(traces))
+
+        @fixture(scope="class")
+        @use(ss_tracer)
+        def cls_fix(traces, request):
+            name = request.cls.__name__[-1]
+            traces.append(f"{name}-a")
+            yield name
+            traces.append(f"{name}-z")
+
+        class TestX:
+            @use(ss_tracer)
+            def test_one(self, tr):
+                tr.append("x1")
+
+            @use(ss_tracer, cls_fix)
+            def test_two(self, tr, fix):
+                tr.append(f"{fix}-x2")
+
+            @use(ss_tracer)
+            def test_three(self, tr):
+                tr.append("x3")
+
+        class TestY:
+            @use(ss_tracer)
+            def test_one(self, tr):
+                tr.append("y1")
+
+            @use(ss_tracer, cls_fix)
+            def test_two(self, tr, fix):
+                tr.append(f"{fix}-y2")
+
+            @use(ss_tracer)
+            def test_three(self, tr):
+                tr.append("y3")
+
+    pytester = request.getfixturevalue("pytester")
+    pytester.makepyfile(test_py)
+    result = pytester.runpytest("-s")
+    result.stdout.fnmatch_lines([
+        "* x1 X-a X-x2 x3 X-z y1 Y-a Y-y2 y3 Y-z",
+    ])
+    result.assert_outcomes(passed=6)
+
+
+def test_module_scope(request):
+    @get_source
+    def fix_py():
+        from unmagic import fixture, use
+
+        @fixture(scope="session")
+        def ss_tracer():
+            traces = []
+            yield traces
+            print("", " ".join(traces))
+
+        @fixture(scope="module")
+        @use(ss_tracer)
+        def mod_fix(traces, request):
+            name = request.module.__name__[-4:]
+            traces.append(f"{name}-a")
+            yield name
+            traces.append(f"{name}-z")
+
+    @get_source
+    def mod1_py():
+        from unmagic import use
+        from fix import ss_tracer, mod_fix
+
+        @use(ss_tracer)
+        def test_one(tr):
+            tr.append("x1")
+
+        @use(ss_tracer, mod_fix)
+        def test_two(tr, fix):
+            tr.append(f"{fix}-x2")
+
+        @use(ss_tracer)
+        def test_three(tr):
+            tr.append("x3")
+
+    @get_source
+    def mod2_py():
+        from unmagic import use
+        from fix import ss_tracer, mod_fix
+
+        @use(ss_tracer)
+        def test_one(tr):
+            tr.append("y1")
+
+        @use(ss_tracer, mod_fix)
+        def test_two(tr, fix):
+            tr.append(f"{fix}-y2")
+
+        @use(ss_tracer)
+        def test_three(tr):
+            tr.append("y3")
+
+    pytester = request.getfixturevalue("pytester")
+    pytester.makepyfile(fix=fix_py, test_mod1=mod1_py, test_mod2=mod2_py)
+
+    result = pytester.runpytest("-s")
+    result.stdout.fnmatch_lines([
+        "* x1 mod1-a mod1-x2 x3 mod1-z y1 mod2-a mod2-y2 y3 mod2-z",
+    ])
+    result.assert_outcomes(passed=6)

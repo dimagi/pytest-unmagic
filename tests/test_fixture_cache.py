@@ -68,6 +68,14 @@ class TestScopeKeys:
 
 
 class FakeRequest:
+
+    @property
+    def node(self):
+        return self
+
+    def getparent(self, node_type):
+        return self
+
     def addfinalizer(self, fin):
         assert not hasattr(self, "close")
         self.close = fin

@@ -6,11 +6,12 @@ standard Python import semantics.
 from collections import defaultdict, namedtuple
 from contextlib import ExitStack, contextmanager, nullcontext
 from functools import wraps
-from inspect import Parameter, signature
+from inspect import Parameter, ismethod, signature
 from types import GeneratorType
 
 import pytest
-from _pytest.fixtures import getfixturemarker
+from _pytest.fixtures import get_scope_node, getfixturemarker
+from _pytest.scope import Scope
 
 __all__ = ["fixture", "use"]
 
@@ -48,6 +49,10 @@ def use(*fixtures):
             request = kw.pop("request") if discard else kw["request"]
             cache = Cache(request, get_scope_data(request))
             fixture_args = [cache.get(f) for f in fixtures]
+            if args and ismethod(request.function):
+                # retain self as first argument
+                fixture_args.insert(0, args[0])
+                args = args[1:]
             return func(*fixture_args, *args, **kw)
 
         run_with_fixtures.has_unmagic_fixtures = True
@@ -108,9 +113,8 @@ class Cache:
         return node.addfinalizer
 
     def get_scope_node(self, scope):
-        if scope == "function":
-            return self.request
-        raise NotImplementedError
+        scope_enum = Scope.from_user(scope, "unmagic fixture cache")
+        return get_scope_node(self.request.node, scope_enum)
 
     def make_context(self, fixture):
         if getattr(fixture, "has_unmagic_fixtures", False):
