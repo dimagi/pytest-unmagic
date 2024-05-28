@@ -33,6 +33,7 @@ def check_done(traces):
 def test_unmagic_fixture(_, fixed, traces):
     assert fixed == "fixed value"
     assert traces == ["fixing..."]
+    assert test_unmagic_fixture.unmagic_fixtures == (check_done, fix, tracer)
 
 
 def test_unmagic_fixture_as_context_manager():

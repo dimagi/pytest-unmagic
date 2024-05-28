@@ -92,7 +92,7 @@ def use(*fixtures):
                             f"{type(exc).__name__}: {exc}")
             return func(*fixture_args, *args, **kw)
 
-        run_with_fixtures.has_unmagic_fixtures = True
+        run_with_fixtures.unmagic_fixtures = fixtures
         sig = signature(func)
         new_params = list(sig.parameters.values())[len(fixtures):]
         num_params = sum(_N_PARAMS(p.kind, 0) for p in sig.parameters.values())
