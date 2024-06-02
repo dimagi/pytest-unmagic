@@ -4,7 +4,7 @@ Unmagical fixtures make it obvious where a fixture comes from using
 standard Python import semantics.
 """
 from collections import namedtuple
-from contextlib import ExitStack, contextmanager, nullcontext
+from contextlib import _GeneratorContextManager, ExitStack, nullcontext
 from functools import wraps
 from inspect import Parameter, ismethod, signature
 from types import GeneratorType
@@ -20,27 +20,43 @@ __all__ = ["fixture", "use"]
 def fixture(func=None, /, scope="function"):
     """Unmagic fixture decorator
 
-    Applies ``contextlib.contextmanager`` to the decorated function.
-    Decorated functions will not be run as tests, regardless of their
-    name.
+    The decorated function becomes a context manager very similar to
+    `contextlib.contextmanager`, and therefore must `yield` exactly
+    once. The yielded value becomes the value of the fixture and is
+    passed to the function to which the fixture is applied if there
+    is a positional argument to receive it. Fixtures may be passed to
+    `@use()` or applied directly as a decorator to a test. However, a
+    fixture cannot be applied directly as a decorator to another fixture
+    because it would not be active during the other fixture's generator
+    context. Fixtures will not be run as tests, regardless of their name.
 
-    Fixtures can be assigned a scope. Scoped fixtures are setup
-    immediately before the first test that uses them. Teardown occurs
-    after all tests in the scope have been run.
+    Fixtures can be assigned a scope. Scoped fixtures are setup for the
+    first test that uses them and torn down at the end of the scope.
 
-    To have a fixture automatically applied to all tests in a scope,
-    `@use` decorators may be applied to the corresponding setup
-    function. For example, a module-scoped fixture can be applied to all
-    tests in a given module by applying it to a function named
-    `setup_module` in the module. As another example, a function-scoped
-    fixture may be applied to every function in a module by applying it
-    to `setup_function` in the module.
+    To have a fixture automatically set up before the first test in a
+    scope, it may be applied to a corresponding setup function. For
+    example, a module-scoped fixture can be set up before any tests are
+    run in a given module by applying it to a function named
+    `setup_module`. As another example, a function-scoped fixture will
+    be set up before each test in a module by applying it to a function
+    named `setup_function` or similarly `setup_method` on a class.
     """
     def fixture(func):
-        func.is_unmagic_fixture = True
-        func.scope = scope
-        func.__test__ = False
-        return contextmanager(validate_generator(func))
+        @wraps(func)
+        def unmagic_fixture(function=None, /, *args, **kw):
+            if function is None:
+                return _FixtureContextManager(_yield_from(func), args, kw)
+            if args or kw:
+                raise NotImplementedError(
+                    "Applying a fixture to a function with additional fixture "
+                    "arguments is not implemented. Please submit a feature "
+                    "request if there is a valid use case."
+                )
+            return use(unmagic_fixture)(function)
+        unmagic_fixture.is_unmagic_fixture = True
+        unmagic_fixture.scope = scope
+        unmagic_fixture.__test__ = False
+        return unmagic_fixture
     return fixture if func is None else fixture(func)
 
 
@@ -97,6 +113,9 @@ def use(*fixtures):
         new_params = list(sig.parameters.values())[len(fixtures):]
         num_params = sum(_N_PARAMS(p.kind, 0) for p in sig.parameters.values())
         run_with_fixtures.__signature__ = sig.replace(parameters=new_params)
+        if getattr(func, "is_unmagic_fixture", False):
+            func, scope = func.__wrapped__, func.scope
+            return fixture(run_with_fixtures, scope=scope)
         return run_with_fixtures
     return apply_fixtures
 
@@ -158,11 +177,20 @@ _exit_key = object()
 Result = namedtuple("Result", ["value", "exc"])
 
 
-def validate_generator(func):
+class _FixtureContextManager(_GeneratorContextManager):
+
+    def __call__(self, func):
+        @wraps(self.func)
+        def unmagic_fixture():
+            return self._recreate_cm()
+        return use(unmagic_fixture)(func)
+
+
+def _yield_from(func):
     @wraps(func)
-    def validate(*args, **kw):
+    def fixture_generator(*args, **kw):
         gen = func(*args, **kw)
         if not isinstance(gen, GeneratorType):
             raise TypeError(f"fixture {func.__name__!r} does not yield")
-        return gen
-    return validate
+        yield from gen
+    return fixture_generator

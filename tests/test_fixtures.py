@@ -53,6 +53,41 @@ def test_params(traces, _, p1, p2):
     traces.append("done")
 
 
+@check_done
+@fix
+@tracer
+def test_unmagic_fixture_as_decorator(traces, fixed):
+    assert traces == ["fixing..."]
+    assert fixed == "fixed value"
+    assert test_unmagic_fixture_as_decorator.unmagic_fixtures == (check_done,)
+
+
+@fixture
+def addtwo(num=1):
+    yield num + 2
+
+
+@addtwo
+def test_fixture_with_default_arg_value(num):
+    assert num == 3
+
+
+@addtwo(num=40)
+def test_fixture_with_keyword_argument(num):
+    assert num == 42
+
+
+@fixture
+@addtwo(num=2)
+def incr(num, val=0):
+    yield num + val + 1
+
+
+@incr(val=3)
+def test_compound_fixture_with_keyword_argument_as_decorator(num):
+    assert num == 8
+
+
 @contextmanager
 def plain_context():
     yield "other"
