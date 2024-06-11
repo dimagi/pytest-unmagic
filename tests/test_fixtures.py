@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from unittest.mock import patch
 
 import pytest
 from _pytest.capture import capsys
@@ -86,6 +87,32 @@ def incr(num, val=0):
 @incr(val=3)
 def test_compound_fixture_with_keyword_argument_as_decorator(num):
     assert num == 8
+
+
+class Thing:
+    x = 0
+    y = 4000
+    z = -1
+
+
+@fixture
+@use(
+    addtwo(num=700),
+    patch.object(Thing, "z"),
+    patch.object(Thing, "x", 2),
+)
+def adding_patches(value, zmock):
+    assert Thing.x == 2
+    yield value + Thing.y
+    assert Thing.z is zmock
+
+
+@adding_patches
+@patch.object(Thing, "y")
+def test_patch_with_unmagic_fixture(val, mock):
+    # note: 'mock' argument is second because of the way patch applies args
+    assert val == 4702  # note: adding_patches is setup before patch is applied
+    assert Thing.y is mock
 
 
 @contextmanager

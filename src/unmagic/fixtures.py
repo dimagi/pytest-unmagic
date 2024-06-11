@@ -170,6 +170,8 @@ class Cache:
     def make_context(self, fixture):
         if getfixturemarker(fixture) is not None:
             return nullcontext(get_fixture_value(fixture.__name__))
+        if hasattr(fixture, "__enter__"):
+            return fixture
         return fixture()
 
 
