@@ -17,7 +17,7 @@ _addfinalizers_key = pytest.StashKey()
 
 
 def get_scope_data():
-    """Get scope data for the current thread"""
+    """Get scope data from the active session"""
     stash = get_active().session.stash
     value = stash.get(_scope_data_key, None)
     if value is None:
@@ -76,7 +76,16 @@ def pytest_collection(session):
             scope=scope,
             autouse=True,
         )
+        # ensure scope fixtures are run before other fixtures in the
+        # same scope so get_fixture_value() uses the correct request
+        _autouse_fixture_try_first(func.__name__, session._fixturemanager)
         addfinalizers[scope] = _get_addfinalizer(session, func.__name__, scope)
+
+
+def _autouse_fixture_try_first(name, fixturemanager):
+    names = fixturemanager._nodeid_autousenames['']
+    assert names[-1] == name, f"{names}[-1] != {name!r}"
+    names.insert(0, names.pop())
 
 
 def _make_scope_fixture(scope):
