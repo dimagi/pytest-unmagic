@@ -11,6 +11,7 @@ from functools import wraps
 
 import pytest
 from _pytest.main import Session
+from _pytest.python import Package
 
 _active = None
 _previous_active = pytest.StashKey()
@@ -72,6 +73,7 @@ def pytest_collection(session):
         _make_scope_fixture("function"),
         _skip_if_cls_is_none(_make_scope_fixture("class")),
         _make_scope_fixture("module"),
+        _make_scope_fixture("package"),
         _make_scope_fixture("session"),
     ]:
         scope = func.scope
@@ -82,13 +84,18 @@ def pytest_collection(session):
             scope=scope,
             autouse=True,
         )
-        # ensure scope fixtures are run before other fixtures in the
-        # same scope so get_fixture_value() uses the correct request
         _autouse_fixture_try_first(func.__name__, session._fixturemanager)
 
 
-def _autouse_fixture_try_first(name, fixturemanager):
-    names = fixturemanager._nodeid_autousenames['']
+def pytest_collectstart(collector):
+    if isinstance(collector, Package):
+        _register_package_fixture(collector, collector.session)
+
+
+def _autouse_fixture_try_first(name, fixturemanager, nodeid=''):
+    # ensure scope fixtures are run before other fixtures in the
+    # same scope so get_request() returns a properly scoped request
+    names = fixturemanager._nodeid_autousenames[nodeid]
     assert names[-1] == name, f"{names}[-1] != {name!r}"
     names.insert(0, names.pop())
 
@@ -116,6 +123,21 @@ def _skip_if_cls_is_none(class_fixture):
         else:
             yield from class_fixture(request)
     return fixture
+
+
+def _register_package_fixture(pkg, session):
+    scope = "package"
+    func = _make_scope_fixture(scope)
+    func.__name__ += "__" + pkg.nodeid
+    session._fixturemanager._register_fixture(
+        name=func.__name__,
+        func=func,
+        nodeid=pkg.nodeid,
+        scope=scope,
+        autouse=True,
+    )
+    _autouse_fixture_try_first(
+        func.__name__, session._fixturemanager, pkg.nodeid)
 
 
 def get_active(session=None):

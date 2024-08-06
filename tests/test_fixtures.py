@@ -338,6 +338,73 @@ def test_module_scope():
     result.assert_outcomes(passed=6)
 
 
+def test_package_scope():
+    @get_source
+    def fix_py():
+        from unmagic import fixture
+
+        @fixture(scope="session")
+        def ss_tracer():
+            traces = []
+            yield traces
+            print("\n", " ".join(traces))
+
+    @get_source
+    def init_py():
+        from unmagic import fixture, use
+        from fix import ss_tracer
+
+        @fixture(scope="package")
+        @use(ss_tracer)
+        def pkg_fix(traces):
+            name = pkg_fix.get_request().node.nodeid.replace("/", ".")
+            traces.append(f"{name}-a")
+            yield
+            traces.append(f"{name}-z")
+
+    @get_source
+    def mod_py():
+        from unmagic import fixture, use
+        from fix import ss_tracer
+        from . import pkg_fix
+
+        @fixture(scope="module")
+        @use(pkg_fix)
+        def modname():
+            yield __name__.rsplit(".", 1)[-1].replace("test_mod", "m")
+
+        @use(ss_tracer, modname)
+        def test_one(tr, mod):
+            tr.append(f"{mod}.t1")
+
+        @use(ss_tracer, modname)
+        def test_two(tr, mod):
+            tr.append(f"{mod}.t2")
+
+    pytester = get_fixture_value("pytester")
+
+    (pytester.path / "pkg/sub").mkdir(parents=True)
+    (pytester.path / "pkg/sub/__init__.py").write_text(init_py)
+    (pytester.path / "pkg/sub/test_mod0.py").write_text(mod_py)
+
+    (pytester.path / "pkg/__init__.py").write_text(init_py)
+    (pytester.path / "pkg/test_mod1.py").write_text(mod_py)
+    (pytester.path / "pkg/test_mod2.py").write_text(mod_py)
+
+    (pytester.path / "pkg/up").mkdir()
+    (pytester.path / "pkg/up/__init__.py").write_text(init_py)
+    (pytester.path / "pkg/up/test_mod3.py").write_text(mod_py)
+
+    (pytester.path / "fix.py").write_text(fix_py)
+
+    result = pytester.runpytest("-s", "-punmagic.scope")
+    result.stdout.fnmatch_lines([
+        " pkg.sub-a m0.t1 m0.t2 pkg.sub-z"
+        " pkg-a m1.t1 m1.t2 m2.t1 m2.t2 pkg.up-a m3.t1 m3.t2 pkg.up-z pkg-z"
+    ])
+    result.assert_outcomes(passed=8)
+
+
 def test_setup_function(request):
     @get_source
     def test_py():
