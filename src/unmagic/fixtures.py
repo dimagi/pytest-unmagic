@@ -30,8 +30,11 @@ def fixture(func=None, /, scope="function"):
     because it would not be active during the other fixture's generator
     context. Fixtures will not be run as tests, regardless of their name.
 
-    Fixtures can be assigned a scope. Scoped fixtures are setup for the
-    first test that uses them and torn down at the end of the scope.
+    A fixture can be assigned a scope. It will be setup for the first
+    test that uses it and torn down at the end of its scope.
+
+    The fixture's `get_value()` function can be used within its scope or
+    a lower scope to setup and retrieve the value of the fixture.
 
     To have a fixture automatically set up before the first test in a
     scope, it may be applied to a corresponding setup function. For
@@ -53,8 +56,13 @@ def fixture(func=None, /, scope="function"):
                     "request if there is a valid use case."
                 )
             return use(unmagic_fixture)(function)
+
+        def get_value():
+            return Cache(get_scope_data()).get(unmagic_fixture)
+
         unmagic_fixture.is_unmagic_fixture = True
         unmagic_fixture.scope = scope
+        unmagic_fixture.get_value = get_value
         unmagic_fixture.__test__ = False
         return unmagic_fixture
     return fixture if func is None else fixture(func)

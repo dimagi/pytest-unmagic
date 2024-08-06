@@ -168,6 +168,52 @@ def test_get_fixture_value_with_unmagic_fixture():
         get_fixture_value(tracer)
 
 
+def test_fixture_get_value(request):
+    @get_source
+    def test_py():
+        from unmagic import fixture, use
+
+        @fixture(scope="session")
+        def ss_tracer():
+            traces = []
+            yield traces
+            print("", " ".join(traces))
+
+        @fixture(scope="module")
+        @use(ss_tracer)
+        def mod_fix(traces):
+            name = "mod"
+            traces.append(f"{name}-a")
+            yield name
+            traces.append(f"{name}-z")
+
+        @use(ss_tracer)
+        def setup_function(tr):
+            tr.append("sf")
+            val = mod_fix.get_value()
+            assert val == "mod"
+
+        @use(ss_tracer)
+        def test_x0(tr):
+            val = mod_fix.get_value()
+            assert val == "mod"
+            tr.append("x0")
+
+        @use(ss_tracer)
+        def test_x1(tr):
+            tr.append("x1")
+            val = mod_fix.get_value()
+            assert val == "mod"
+
+    pytester = request.getfixturevalue("pytester")
+    pytester.makepyfile(test_py)
+    result = pytester.runpytest("-sl", "--tb=long", "-punmagic.scope")
+    result.stdout.fnmatch_lines([
+        "* sf mod-a x0 sf x1 mod-z",
+    ])
+    result.assert_outcomes(passed=2)
+
+
 class TestMethodUse:
 
     @use(tracer, check_done)
