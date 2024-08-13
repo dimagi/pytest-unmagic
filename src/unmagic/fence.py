@@ -1,3 +1,4 @@
+"""PYTEST_DONT_REWRITE"""
 import warnings
 from contextlib import contextmanager
 
