@@ -12,7 +12,7 @@ from types import GeneratorType
 import pytest
 from _pytest.fixtures import getfixturemarker
 
-from .scope import get_active, get_addfinalizer, get_scope_data
+from .scope import get_request, get_scope_data
 
 __all__ = ["fixture", "use"]
 
@@ -62,6 +62,7 @@ def fixture(func=None, /, scope="function"):
 
         unmagic_fixture.is_unmagic_fixture = True
         unmagic_fixture.scope = scope
+        unmagic_fixture.get_request = lambda: get_request(scope)
         unmagic_fixture.get_value = get_value
         unmagic_fixture.__test__ = False
         return unmagic_fixture
@@ -78,12 +79,7 @@ def get_fixture_value(name):
     """
     if not isinstance(name, str):
         raise ValueError("magic fixture name must be a string")
-    requests = get_active().requests
-    if not requests:
-        raise ValueError("There is no active pytest request")
-    if name == "request":
-        return requests[-1]
-    return requests[-1].getfixturevalue(name)
+    return get_request().getfixturevalue(name)
 
 
 def use(*fixtures):
@@ -102,7 +98,7 @@ def use(*fixtures):
         @wraps(func)
         def run_with_fixtures(*args, **kw):
             try:
-                request = get_fixture_value("request")
+                request = get_request()
                 cache = Cache(get_scope_data())
                 fixture_args = [cache.get(f) for f in fixtures]
                 if args and ismethod(request.function):
@@ -156,7 +152,7 @@ class Cache:
         assert fixture_key not in values
         exit = values.get(_exit_key)
         if exit is None:
-            on_exit_scope = get_addfinalizer(scope_key)
+            on_exit_scope = get_request(scope_key).addfinalizer
             exit = values[_exit_key] = ExitStack()
             exit.callback(self.scope_data.pop, scope_key)
             on_exit_scope(exit.close)

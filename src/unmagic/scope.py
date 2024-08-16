@@ -13,7 +13,18 @@ import pytest
 _active = None
 _previous_active = pytest.StashKey()
 _scope_data_key = pytest.StashKey()
-_addfinalizers_key = pytest.StashKey()
+
+
+def get_request(scope="function"):
+    """Get the active request
+
+    :param scope: Optional scope. Default "function".
+    :raises: ``ValueError`` if there is no active request in scope.
+    """
+    requests = get_active().requests.get(scope)
+    if not requests:
+        raise ValueError(f"There is no active {scope}-scoped request")
+    return requests[-1]
 
 
 def get_scope_data():
@@ -23,11 +34,6 @@ def get_scope_data():
     if value is None:
         value = stash[_scope_data_key] = defaultdict(dict)
     return value
-
-
-def get_addfinalizer(scope):
-    """Get a functcion that adds a scope finalizer"""
-    return get_active().session.stash[_addfinalizers_key][scope]
 
 
 def pytest_configure(config):
@@ -50,10 +56,10 @@ def pytest_sessionstart(session):
         from threading import local
         value = local()
         value.session = session
-        value.requests = []
+        value.requests = defaultdict(list)
         set_active(value)
     """
-    set_active(Active(session, []))
+    set_active(Active(session, defaultdict(list)))
 
 
 def pytest_sessionfinish():
@@ -61,7 +67,6 @@ def pytest_sessionfinish():
 
 
 def pytest_collection(session):
-    session.stash[_addfinalizers_key] = addfinalizers = {}
     for func in [
         _make_scope_fixture("function"),
         _skip_if_cls_is_none(_make_scope_fixture("class")),
@@ -79,7 +84,6 @@ def pytest_collection(session):
         # ensure scope fixtures are run before other fixtures in the
         # same scope so get_fixture_value() uses the correct request
         _autouse_fixture_try_first(func.__name__, session._fixturemanager)
-        addfinalizers[scope] = _get_addfinalizer(session, func.__name__, scope)
 
 
 def _autouse_fixture_try_first(name, fixturemanager):
@@ -90,14 +94,13 @@ def _autouse_fixture_try_first(name, fixturemanager):
 
 def _make_scope_fixture(scope):
     def fixture(request):
-        active = get_active(request.session)
-        active.requests.append(request)
+        requests = get_active(request.session).requests[scope]
+        requests.append(request)
         try:
             yield
         finally:
-            req = active.requests[-1]
-            assert req is request, f"{req} is not {request}"
-            active.requests.pop()
+            assert requests[-1] is request, f"{requests[-1]} is not {request}"
+            requests.pop()
 
     fixture.scope = scope
     fixture.__name__ = f"unmagic_{scope}_scope"
@@ -112,13 +115,6 @@ def _skip_if_cls_is_none(class_fixture):
         else:
             yield from class_fixture(request)
     return fixture
-
-
-def _get_addfinalizer(session, name, scope):
-    faclist = session._fixturemanager._arg2fixturedefs[name]
-    fixturedef = faclist[-1]
-    assert fixturedef.scope == scope, f"{fixturedef.scope} != {scope}"
-    return fixturedef.addfinalizer
 
 
 def get_active(session=None):

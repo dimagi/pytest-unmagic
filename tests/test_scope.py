@@ -36,13 +36,14 @@ def test_no_active_request_error():
     @get_source
     def conftest():
         import pytest
-        from unmagic import get_fixture_value
+        from unmagic.scope import get_request
 
         calls = []
 
         def pytest_runtestloop():
-            with pytest.raises(ValueError, match="no active pytest request"):
-                get_fixture_value("request")
+            with pytest.raises(ValueError,
+                               match="no active function-scoped request"):
+                get_request()
             calls.append("run")
 
     @get_source
@@ -63,11 +64,11 @@ def test_no_active_request_error():
 def test_scope_fixture_runs_first():
     @get_source
     def test_py():
-        from unmagic import get_fixture_value
+        from unmagic.scope import get_request
 
         def test():
             # not a great test, detects effect of _autouse_fixture_try_first
-            request = get_fixture_value("request")
+            request = get_request()
             autos = request.session._fixturemanager._nodeid_autousenames['']
             session_index = autos.index("unmagic_session_scope")
             function_index = autos.index("unmagic_function_scope")

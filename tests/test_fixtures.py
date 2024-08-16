@@ -224,7 +224,7 @@ class TestMethodUse:
 def test_class_and_session_scope():
     @get_source
     def test_py():
-        from unmagic import fixture, get_fixture_value, use
+        from unmagic import fixture, use
 
         @fixture(scope="session")
         def ss_tracer():
@@ -235,7 +235,7 @@ def test_class_and_session_scope():
         @fixture(scope="class")
         @use(ss_tracer)
         def cls_fix(traces):
-            name = get_fixture_value("request").cls.__name__[-1]
+            name = cls_fix.get_request().cls.__name__[-1]
             traces.append(f"{name}-a")
             yield name
             traces.append(f"{name}-z")
@@ -278,7 +278,7 @@ def test_class_and_session_scope():
 def test_module_scope():
     @get_source
     def fix_py():
-        from unmagic import fixture, get_fixture_value, use
+        from unmagic import fixture, use
 
         @fixture(scope="session")
         def ss_tracer():
@@ -289,7 +289,7 @@ def test_module_scope():
         @fixture(scope="module")
         @use(ss_tracer)
         def mod_fix(traces):
-            name = get_fixture_value("request").module.__name__[-4:]
+            name = mod_fix.get_request().module.__name__[-4:]
             traces.append(f"{name}-a")
             yield name
             traces.append(f"{name}-z")
@@ -341,7 +341,7 @@ def test_module_scope():
 def test_setup_function(request):
     @get_source
     def test_py():
-        from unmagic import fixture, get_fixture_value, use
+        from unmagic import fixture, use
 
         @fixture(scope="session")
         def ss_tracer():
@@ -352,7 +352,7 @@ def test_setup_function(request):
         @fixture
         @use(ss_tracer)
         def fun_fix(traces):
-            name = f"t{get_fixture_value('request').function.__name__[-1]}"
+            name = f"t{fun_fix.get_request().function.__name__[-1]}"
             traces.append(f"{name}-a")
             yield name
             traces.append(f"{name}-z")
