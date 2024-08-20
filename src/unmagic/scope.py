@@ -5,10 +5,12 @@ values, and a function to add scope finalizers.
 
 PYTEST_DONT_REWRITE
 """
-from collections import defaultdict, namedtuple
+from collections import defaultdict
+from dataclasses import dataclass, field
 from functools import wraps
 
 import pytest
+from _pytest.main import Session
 
 _active = None
 _previous_active = pytest.StashKey()
@@ -55,11 +57,10 @@ def pytest_sessionstart(session):
     def pytest_runtestloop(session):
         from threading import local
         value = local()
-        value.session = session
-        value.requests = defaultdict(list)
+        value.__dict__.update(vars(Active(session)))
         set_active(value)
     """
-    set_active(Active(session, defaultdict(list)))
+    set_active(Active(session))
 
 
 def pytest_sessionfinish():
@@ -132,4 +133,7 @@ def set_active(value):
     _active = value
 
 
-Active = namedtuple("Active", ["session", "requests"])
+@dataclass(frozen=True)
+class Active:
+    session: Session
+    requests: defaultdict = field(default_factory=lambda: defaultdict(list))
