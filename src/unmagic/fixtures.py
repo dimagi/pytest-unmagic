@@ -12,7 +12,7 @@ from types import GeneratorType
 import pytest
 from _pytest.fixtures import getfixturemarker
 
-from .scope import get_request, get_scope_data
+from .scope import get_active, get_request, get_scope_data
 
 __all__ = ["fixture", "use"]
 
@@ -35,14 +35,6 @@ def fixture(func=None, /, scope="function"):
 
     The fixture's `get_value()` function can be used within its scope or
     a lower scope to setup and retrieve the value of the fixture.
-
-    To have a fixture automatically set up before the first test in a
-    scope, it may be applied to a corresponding setup function. For
-    example, a module-scoped fixture can be set up before any tests are
-    run in a given module by applying it to a function named
-    `setup_module`. As another example, a function-scoped fixture will
-    be set up before each test in a module by applying it to a function
-    named `setup_function` or similarly `setup_method` on a class.
     """
     def fixture(func):
         @wraps(func)
@@ -98,10 +90,10 @@ def use(*fixtures):
         @wraps(func)
         def run_with_fixtures(*args, **kw):
             try:
-                request = get_request()
+                requests = get_active().requests.get("function")
                 cache = Cache(get_scope_data())
                 fixture_args = [cache.get(f) for f in fixtures]
-                if args and ismethod(request.function):
+                if args and requests and ismethod(requests[-1].function):
                     # retain self as first argument
                     fixture_args.insert(0, args[0])
                     args = args[1:]
