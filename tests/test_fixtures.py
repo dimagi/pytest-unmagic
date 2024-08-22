@@ -37,11 +37,6 @@ def test_unmagic_fixture(_, fixed, traces):
     assert test_unmagic_fixture.unmagic_fixtures == (check_done, fix, tracer)
 
 
-def test_unmagic_fixture_as_context_manager():
-    with tracer() as traces:
-        assert traces == []
-
-
 @use(tracer, check_done)
 def test_unmagic_fixture_with_more_fixtures_than_args(traces):
     traces.append("done")
@@ -120,15 +115,8 @@ def plain_context():
     yield "other"
 
 
-@contextmanager
-@use(tracer)
-def plain_context_using_fixture(traces):
-    yield traces
-
-
-@use(plain_context_using_fixture, tracer, plain_context)
-def test_plain_contextmanager_fixture(context_traces, traces, other):
-    assert context_traces is traces
+@use(plain_context)
+def test_plain_contextmanager_fixture(other):
     assert other == "other"
 
 
@@ -157,10 +145,9 @@ def test_malformed_unmagic_fixture(request):
         test(request=request)
 
 
-def test_malformed_unmagic_fixture_as_context_manager():
+def test_malformed_unmagic_fixture_get_value():
     with pytest.raises(TypeError, match="fixture 'broken_fix' does not yield"):
-        with broken_fix():
-            assert 0, "should not get here"
+        broken_fix.get_value()
 
 
 def test_get_fixture_value_with_unmagic_fixture():

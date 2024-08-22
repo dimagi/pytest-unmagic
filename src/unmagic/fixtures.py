@@ -1,18 +1,17 @@
 """Simple unmagical fixture decorators
 
-Unmagical fixtures make it obvious where a fixture comes from using
-standard Python import semantics.
+Unmagic fixtures use standard Python import semantics, making their
+origins more intuitive.
 """
-from collections import namedtuple
-from contextlib import _GeneratorContextManager, ExitStack, nullcontext
-from functools import wraps
+from functools import cached_property, wraps
 from inspect import Parameter, ismethod, signature
 from types import GeneratorType
 
 import pytest
+from _pytest.compat import is_generator
 from _pytest.fixtures import getfixturemarker
 
-from .scope import get_active, get_request, get_scope_data
+from .scope import get_active, get_request
 
 __all__ = ["fixture", "use"]
 
@@ -20,15 +19,10 @@ __all__ = ["fixture", "use"]
 def fixture(func=None, /, scope="function"):
     """Unmagic fixture decorator
 
-    The decorated function becomes a context manager very similar to
-    `contextlib.contextmanager`, and therefore must `yield` exactly
-    once. The yielded value becomes the value of the fixture and is
-    passed to the function to which the fixture is applied if there
-    is a positional argument to receive it. Fixtures may be passed to
-    `@use()` or applied directly as a decorator to a test. However, a
-    fixture cannot be applied directly as a decorator to another fixture
-    because it would not be active during the other fixture's generator
-    context. Fixtures will not be run as tests, regardless of their name.
+    The decorated function must `yield` exactly once. The yielded value
+    will be the fixture value, and code after the yield is executed at
+    teardown. Fixtures may be passed to `@use()` or applied directly as
+    a decorator to a test or other fixture.
 
     A fixture can be assigned a scope. It will be setup for the first
     test that uses it and torn down at the end of its scope.
@@ -37,27 +31,7 @@ def fixture(func=None, /, scope="function"):
     a lower scope to setup and retrieve the value of the fixture.
     """
     def fixture(func):
-        @wraps(func)
-        def unmagic_fixture(function=None, /, *args, **kw):
-            if function is None:
-                return _FixtureContextManager(_yield_from(func), args, kw)
-            if args or kw:
-                raise NotImplementedError(
-                    "Applying a fixture to a function with additional fixture "
-                    "arguments is not implemented. Please submit a feature "
-                    "request if there is a valid use case."
-                )
-            return use(unmagic_fixture)(function)
-
-        def get_value():
-            return Cache(get_scope_data()).get(unmagic_fixture)
-
-        unmagic_fixture.is_unmagic_fixture = True
-        unmagic_fixture.scope = scope
-        unmagic_fixture.get_request = lambda: get_request(scope)
-        unmagic_fixture.get_value = get_value
-        unmagic_fixture.__test__ = False
-        return unmagic_fixture
+        return UnmagicFixture(func, scope)
     return fixture if func is None else fixture(func)
 
 
@@ -80,6 +54,8 @@ def use(*fixtures):
     Fixtures are passed to the function as positional arguments in the
     same order as they were passed to this decorator factory. Additional
     arguments passed to decorated functions are applied after fixtures.
+    Fixture values that do not have a corresponding positional argument
+    will not be passed to the decorated function.
 
     Any context manager may be used as a fixture.
     """
@@ -90,9 +66,8 @@ def use(*fixtures):
         @wraps(func)
         def run_with_fixtures(*args, **kw):
             try:
+                fixture_args = [_get_value(f, scope) for f in fixtures]
                 requests = get_active().requests.get("function")
-                cache = Cache(get_scope_data())
-                fixture_args = [cache.get(f) for f in fixtures]
                 if args and requests and ismethod(requests[-1].function):
                     # retain self as first argument
                     fixture_args.insert(0, args[0])
@@ -109,9 +84,10 @@ def use(*fixtures):
         new_params = list(sig.parameters.values())[len(fixtures):]
         num_params = sum(_N_PARAMS(p.kind, 0) for p in sig.parameters.values())
         run_with_fixtures.__signature__ = sig.replace(parameters=new_params)
-        if getattr(func, "is_unmagic_fixture", False):
-            func, scope = func.__wrapped__, func.scope
+        if isinstance(func, UnmagicFixture):
+            func, scope = func.func, func.scope
             return fixture(run_with_fixtures, scope=scope)
+        scope = "function"
         return run_with_fixtures
     return apply_fixtures
 
@@ -122,71 +98,82 @@ _N_PARAMS = {
 }.get
 
 
-class Cache:
-    """Fixture value cache"""
+class UnmagicFixture:
+    __test__ = False
 
-    def __init__(self, scope_data):
-        self.scope_data = scope_data
+    def __init__(self, func, scope, kw=None):
+        self.scope = scope
+        self.func = func
+        self.kw = kw
 
-    def get(self, fixture):
-        scope_key = self.get_scope_key(fixture)
-        fixture_key = self.get_fixture_key(fixture)
-        result = self.scope_data[scope_key].get(fixture_key)
-        if result is None:
-            result = self.execute(fixture, fixture_key, scope_key)
-            self.scope_data[scope_key][fixture_key] = result
-        if result.exc is not None:
-            raise result.exc
-        return result.value
+    def get_request(self):
+        return get_request(self.scope)
 
-    def execute(self, fixture, fixture_key, scope_key):
-        values = self.scope_data[scope_key]
-        assert fixture_key not in values
-        exit = values.get(_exit_key)
-        if exit is None:
-            on_exit_scope = get_request(scope_key).addfinalizer
-            exit = values[_exit_key] = ExitStack()
-            exit.callback(self.scope_data.pop, scope_key)
-            on_exit_scope(exit.close)
-        try:
-            value = exit.enter_context(self.make_context(fixture))
-            exc = None
-        except BaseException as exc_value:
-            value = None
-            exc = exc_value
-        return Result(value, exc)
+    def get_value(self):
+        request = self.get_request()
+        if self._id not in request._arg2fixturedefs:
+            self._register(request)
+        return request.getfixturevalue(self._id)
 
-    def get_scope_key(self, fixture):
-        return getattr(fixture, "scope", "function")
+    @cached_property
+    def _id(self):
+        return repr(self)
 
-    @staticmethod
-    def get_fixture_key(fixture):
-        return fixture
+    @property
+    def __name__(self):
+        return self.func.__name__
 
-    def make_context(self, fixture):
-        if getfixturemarker(fixture) is not None:
-            return nullcontext(get_fixture_value(fixture.__name__))
-        if hasattr(fixture, "__enter__"):
-            return fixture
-        return fixture()
+    def __repr__(self):
+        return f"<{type(self).__name__} {self.__name__} {hex(hash(self))}>"
 
+    def __call__(self, function=None, /, **kw):
+        if function is None:
+            assert not self.kw, f"{self} has unexpected args: {self.kw}"
+            return type(self)(self.func, self.scope, kw)
+        if kw:
+            raise NotImplementedError(
+                "Applying a fixture to a function with additional fixture "
+                "arguments is not implemented. Please submit a feature "
+                "request if there is a valid use case."
+            )
+        return use(self)(function)
 
-_exit_key = object()
-Result = namedtuple("Result", ["value", "exc"])
+    def _register(self, request):
+        request.session._fixturemanager._register_fixture(
+            name=self._id,
+            func=self.get_generator(),
+            nodeid=request.node.nodeid,
+            scope=self.scope,
+        )
 
-
-class _FixtureContextManager(_GeneratorContextManager):
-
-    def __call__(self, func):
-        @wraps(self.func)
-        def unmagic_fixture():
-            return self._recreate_cm()
-        return use(unmagic_fixture)(func)
+    def get_generator(self):
+        if is_generator(self.func) and not self.kw:
+            return self.func
+        return _yield_from(self.func, self.kw)
 
 
-def _yield_from(func):
+def _get_value(fixture, scope):
+    if scope != "function":
+        raise NotImplementedError("TODO test")
+    if isinstance(fixture, UnmagicFixture):
+        return fixture.get_value()
+    if getfixturemarker(fixture) is not None:
+        return get_fixture_value(fixture.__name__)
+    if not hasattr(type(fixture), "__enter__"):
+        fixture = fixture()
+    if hasattr(type(fixture), "__enter__"):
+        def func():
+            with fixture as value:
+                yield value
+        return UnmagicFixture(func, scope).get_value()
+    raise ValueError(f"{fixture} is not a fixture")
+
+
+def _yield_from(func, kwargs):
     @wraps(func)
     def fixture_generator(*args, **kw):
+        if kwargs:
+            kw = kwargs | kw
         gen = func(*args, **kw)
         if not isinstance(gen, GeneratorType):
             raise TypeError(f"fixture {func.__name__!r} does not yield")

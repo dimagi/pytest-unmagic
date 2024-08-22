@@ -27,10 +27,6 @@ def autouse(fixture, /, where=None):
                 f"autouse decorator requires a location (got: {fixture})")
         return partial(autouse, where=fixture)
 
-    def func():
-        with fixture() as value:
-            yield value
-
     session = get_active().session
     path = Path(where)
     if path.name == "__init__.py":
@@ -38,7 +34,7 @@ def autouse(fixture, /, where=None):
     nodeid = bestrelpath(session.config.invocation_params.dir, path)
     session._fixturemanager._register_fixture(
         name=f"{nodeid}::{fixture.__name__}",
-        func=func,
+        func=fixture.get_generator(),
         nodeid=nodeid,
         scope=fixture.scope,
         autouse=True,
