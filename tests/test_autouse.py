@@ -27,8 +27,8 @@ def test_autouse_module_fixture():
         @autouse(__file__)
         @fixture
         @use(ss_tracer)
-        def test_name(tr):
-            name = test_name.get_request().node.name.replace("test_", "")
+        def test_name(tr, request):
+            name = request.node.name.replace("test_", "")
             yield
             tr.append(name)
 
@@ -60,8 +60,8 @@ def test_autouse_package_fixture():
 
         @fixture(scope="package")
         @use(ss_tracer)
-        def pkg_fix(traces):
-            name = pkg_fix.get_request().node.nodeid.replace("/", ".")
+        def pkg_fix(traces, request):
+            name = request.node.nodeid.replace("/", ".")
             traces.append(f"{name}-a")
             yield
             traces.append(f"{name}-z")

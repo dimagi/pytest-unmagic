@@ -34,7 +34,7 @@ def check_done(traces):
 def test_unmagic_fixture(_, fixed, traces):
     assert fixed == "fixed value"
     assert traces == ["fixing..."]
-    assert test_unmagic_fixture.unmagic_fixtures == (check_done, fix, tracer)
+    assert test_unmagic_fixture.unmagic_fixtures == [check_done, fix, tracer]
 
 
 @use(tracer, check_done)
@@ -55,7 +55,8 @@ def test_params(traces, _, p1, p2):
 def test_unmagic_fixture_as_decorator(traces, fixed):
     assert traces == ["fixing..."]
     assert fixed == "fixed value"
-    assert test_unmagic_fixture_as_decorator.unmagic_fixtures == (check_done,)
+    assert test_unmagic_fixture_as_decorator.unmagic_fixtures \
+        == [tracer, check_done]
 
 
 @fixture
@@ -155,7 +156,7 @@ def test_get_fixture_value_with_unmagic_fixture():
         get_fixture_value(tracer)
 
 
-def test_fixture_get_value(request):
+def test_fixture_get_value():
     @get_source
     def test_py():
         from unmagic import fixture, use
@@ -175,12 +176,6 @@ def test_fixture_get_value(request):
             traces.append(f"{name}-z")
 
         @use(ss_tracer)
-        def setup_function(tr):
-            tr.append("sf")
-            val = mod_fix.get_value()
-            assert val == "mod"
-
-        @use(ss_tracer)
         def test_x0(tr):
             val = mod_fix.get_value()
             assert val == "mod"
@@ -192,11 +187,11 @@ def test_fixture_get_value(request):
             val = mod_fix.get_value()
             assert val == "mod"
 
-    pytester = request.getfixturevalue("pytester")
+    pytester = get_fixture_value("pytester")
     pytester.makepyfile(test_py)
-    result = pytester.runpytest("-sl", "--tb=long")
+    result = pytester.runpytest("-sl", "--tb=long", "--setup-show")
     result.stdout.fnmatch_lines([
-        "* sf mod-a x0 sf x1 mod-z",
+        "* mod-a x0 x1 mod-z",
     ])
     result.assert_outcomes(passed=2)
 
@@ -221,8 +216,8 @@ def test_class_and_session_scope():
 
         @fixture(scope="class")
         @use(ss_tracer)
-        def cls_fix(traces):
-            name = cls_fix.get_request().cls.__name__[-1]
+        def cls_fix(traces, request):
+            name = request.cls.__name__[-1]
             traces.append(f"{name}-a")
             yield name
             traces.append(f"{name}-z")
@@ -275,8 +270,8 @@ def test_module_scope():
 
         @fixture(scope="module")
         @use(ss_tracer)
-        def mod_fix(traces):
-            name = mod_fix.get_request().module.__name__[-4:]
+        def mod_fix(traces, request):
+            name = request.module.__name__[-4:]
             traces.append(f"{name}-a")
             yield name
             traces.append(f"{name}-z")
@@ -343,8 +338,8 @@ def test_package_scope():
 
         @fixture(scope="package")
         @use(ss_tracer)
-        def pkg_fix(traces):
-            name = pkg_fix.get_request().node.nodeid.replace("/", ".")
+        def pkg_fix(traces, request):
+            name = request.node.nodeid.replace("/", ".")
             traces.append(f"{name}-a")
             yield
             traces.append(f"{name}-z")
@@ -369,7 +364,6 @@ def test_package_scope():
             tr.append(f"{mod}.t2")
 
     pytester = get_fixture_value("pytester")
-
     (pytester.path / "pkg/sub").mkdir(parents=True)
     (pytester.path / "pkg/sub/__init__.py").write_text(init_py)
     (pytester.path / "pkg/sub/test_mod0.py").write_text(mod_py)
@@ -392,7 +386,7 @@ def test_package_scope():
     result.assert_outcomes(passed=8)
 
 
-def test_setup_function(request):
+def test_setup_function():
     @get_source
     def test_py():
         from unmagic import fixture, use
@@ -405,8 +399,8 @@ def test_setup_function(request):
 
         @fixture
         @use(ss_tracer)
-        def fun_fix(traces):
-            name = f"t{fun_fix.get_request().function.__name__[-1]}"
+        def fun_fix(traces, request):
+            name = f"t{request.function.__name__[-1]}"
             traces.append(f"{name}-a")
             yield name
             traces.append(f"{name}-z")
@@ -427,7 +421,7 @@ def test_setup_function(request):
         def test_x2(tr, ff):
             tr.append(f"x2-{ff}")
 
-    pytester = request.getfixturevalue("pytester")
+    pytester = get_fixture_value("pytester")
     pytester.makepyfile(test_py)
     result = pytester.runpytest("-sl", "--tb=long")
     result.stdout.fnmatch_lines([

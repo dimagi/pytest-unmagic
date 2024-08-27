@@ -46,6 +46,7 @@ def test_fence_with_str():
 
 
 def test_warning_on_magic_fixture_usage(pytester):
+
     @get_source
     def test_py():
         from pytest import fixture
