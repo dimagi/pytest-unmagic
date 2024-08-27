@@ -8,3 +8,5 @@ from .fixtures import fixture, get_fixture_value, use
 
 __version__ = "1.0.0"
 __all__ = ["autouse", "fixture", "get_fixture_value", "use"]
+
+pytest_plugins = ["unmagic.fence", "unmagic.scope"]

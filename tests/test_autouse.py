@@ -35,7 +35,7 @@ def test_autouse_module_fixture():
     pytester = get_fixture_value("pytester")
     pytester.makepyfile(test_py)
 
-    result = pytester.runpytest("-s", "-punmagic.scope")
+    result = pytester.runpytest("-s")
     result.stdout.fnmatch_lines([
         " one two three"
     ])
@@ -102,7 +102,7 @@ def test_autouse_package_fixture():
     (pytester.path / "test_mod4.py").write_text(mod_py)
     (pytester.path / "fix.py").write_text(fix_py)
 
-    result = pytester.runpytest("-s", "-punmagic.scope")
+    result = pytester.runpytest("-s")
     result.stdout.fnmatch_lines([
         " pkg-a"
         " pkg.sub-a m0.t1 m0.t2 pkg.sub-z"

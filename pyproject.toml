@@ -19,7 +19,7 @@ dependencies = [
 
 
 [project.entry-points.pytest11]
-unmagic = "unmagic.scope"
+unmagic = "unmagic"
 
 [project.urls]
 Home = "https://github.com/dimagi/pytest-unmagic"

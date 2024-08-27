@@ -28,7 +28,7 @@ def test_no_active_session_error():
     pytester.makeconftest(conftest)
     pytester.makepyfile(test_py)
 
-    result = pytester.runpytest("-s", "-punmagic.scope")
+    result = pytester.runpytest("-s")
     result.assert_outcomes(passed=1)
 
 
@@ -57,7 +57,7 @@ def test_no_active_request_error():
     pytester.makeconftest(conftest)
     pytester.makepyfile(test_py)
 
-    result = pytester.runpytest("-s", "-punmagic.scope")
+    result = pytester.runpytest("-s")
     result.assert_outcomes(passed=1)
 
 
@@ -77,5 +77,5 @@ def test_scope_fixture_runs_first():
     pytester = get_fixture_value("pytester")
     pytester.makepyfile(test_py)
 
-    result = pytester.runpytest("-s", "-punmagic.scope", "--setup-show")
+    result = pytester.runpytest("-s", "--setup-show")
     result.assert_outcomes(passed=1)

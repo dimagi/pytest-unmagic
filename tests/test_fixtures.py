@@ -194,7 +194,7 @@ def test_fixture_get_value(request):
 
     pytester = request.getfixturevalue("pytester")
     pytester.makepyfile(test_py)
-    result = pytester.runpytest("-sl", "--tb=long", "-punmagic.scope")
+    result = pytester.runpytest("-sl", "--tb=long")
     result.stdout.fnmatch_lines([
         "* sf mod-a x0 sf x1 mod-z",
     ])
@@ -255,7 +255,7 @@ def test_class_and_session_scope():
 
     pytester = get_fixture_value("pytester")
     pytester.makepyfile(test_py)
-    result = pytester.runpytest("-s", "-punmagic.scope")
+    result = pytester.runpytest("-s")
     result.stdout.fnmatch_lines([
         "* x1 X-a X-x2 x3 X-z y1 Y-a Y-y2 y3 Y-z",
     ])
@@ -318,7 +318,7 @@ def test_module_scope():
     pytester = get_fixture_value("pytester")
     pytester.makepyfile(fix=fix_py, test_mod1=mod1_py, test_mod2=mod2_py)
 
-    result = pytester.runpytest("-s", "-punmagic.scope")
+    result = pytester.runpytest("-s")
     result.stdout.fnmatch_lines([
         "* x1 mod1-a mod1-x2 x3 mod1-z y1 mod2-a mod2-y2 y3 mod2-z",
     ])
@@ -384,7 +384,7 @@ def test_package_scope():
 
     (pytester.path / "fix.py").write_text(fix_py)
 
-    result = pytester.runpytest("-s", "-punmagic.scope")
+    result = pytester.runpytest("-s")
     result.stdout.fnmatch_lines([
         " pkg.sub-a m0.t1 m0.t2 pkg.sub-z"
         " pkg-a m1.t1 m1.t2 m2.t1 m2.t2 pkg.up-a m3.t1 m3.t2 pkg.up-z pkg-z"
@@ -429,7 +429,7 @@ def test_setup_function(request):
 
     pytester = request.getfixturevalue("pytester")
     pytester.makepyfile(test_py)
-    result = pytester.runpytest("-sl", "--tb=long", "-punmagic.scope")
+    result = pytester.runpytest("-sl", "--tb=long")
     result.stdout.fnmatch_lines([
         "* t0-a sf x0 t0-z t1-a sf x1 t1-z t2-a sf x2-t2 t2-z",
     ])
