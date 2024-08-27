@@ -5,7 +5,7 @@ import pytest
 from _pytest.capture import capsys
 from _pytest.outcomes import Failed
 
-from unmagic import fence, fixture, get_fixture_value, use
+from unmagic import fence, fixture, get_fixture_value, pytest_request, use
 
 from .util import get_source
 
@@ -137,6 +137,7 @@ def broken_fix():
     return "nope"
 
 
+@use(pytest_request)
 def test_malformed_unmagic_fixture(request):
     @use(broken_fix)
     def test(value):
@@ -206,7 +207,7 @@ class TestMethodUse:
 def test_class_and_session_scope():
     @get_source
     def test_py():
-        from unmagic import fixture, use
+        from unmagic import fixture, pytest_request, use
 
         @fixture(scope="session")
         def ss_tracer():
@@ -215,8 +216,8 @@ def test_class_and_session_scope():
             print("", " ".join(traces))
 
         @fixture(scope="class")
-        @use(ss_tracer)
-        def cls_fix(traces, request):
+        @use(pytest_request, ss_tracer)
+        def cls_fix(request, traces):
             name = request.cls.__name__[-1]
             traces.append(f"{name}-a")
             yield name
@@ -260,7 +261,7 @@ def test_class_and_session_scope():
 def test_module_scope():
     @get_source
     def fix_py():
-        from unmagic import fixture, use
+        from unmagic import fixture, pytest_request, use
 
         @fixture(scope="session")
         def ss_tracer():
@@ -269,7 +270,7 @@ def test_module_scope():
             print("", " ".join(traces))
 
         @fixture(scope="module")
-        @use(ss_tracer)
+        @use(ss_tracer, pytest_request)
         def mod_fix(traces, request):
             name = request.module.__name__[-4:]
             traces.append(f"{name}-a")
@@ -389,7 +390,7 @@ def test_package_scope():
 def test_setup_function():
     @get_source
     def test_py():
-        from unmagic import fixture, use
+        from unmagic import fixture, pytest_request, use
 
         @fixture(scope="session")
         def ss_tracer():
@@ -398,7 +399,7 @@ def test_setup_function():
             print("", " ".join(traces))
 
         @fixture
-        @use(ss_tracer)
+        @use(ss_tracer, pytest_request)
         def fun_fix(traces, request):
             name = f"t{request.function.__name__[-1]}"
             traces.append(f"{name}-a")

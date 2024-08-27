@@ -201,6 +201,11 @@ _SCOPE_NODE_ID = {
 }
 
 
+@fixture
+def pytest_request():
+    yield get_request()
+
+
 def _yield_from(func, kwargs):
     @wraps(func)
     def fixture_generator(*args, **kw):
