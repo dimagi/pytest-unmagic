@@ -1,8 +1,7 @@
 from functools import partial
 from pathlib import Path
 
-from _pytest.pathlib import bestrelpath
-
+from . import _api
 from .scope import get_active
 
 
@@ -31,8 +30,9 @@ def autouse(fixture, /, where=None):
     path = Path(where)
     if path.name == "__init__.py":
         path = path.parent
-    nodeid = bestrelpath(session.config.invocation_params.dir, path)
-    session._fixturemanager._register_fixture(
+    nodeid = _api.bestrelpath(session.config.invocation_params.dir, path)
+    _api.register_fixture(
+        session,
         name=f"{nodeid}::{fixture.__name__}",
         func=fixture.get_generator(),
         nodeid=nodeid,

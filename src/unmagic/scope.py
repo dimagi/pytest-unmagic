@@ -8,8 +8,8 @@ PYTEST_DONT_REWRITE
 from dataclasses import dataclass, field
 
 import pytest
-from _pytest.main import Session
-from _pytest.fixtures import FixtureRequest
+
+from . import _api
 
 _active = None
 _previous_active = pytest.StashKey()
@@ -66,7 +66,7 @@ def pytest_itemcollected(item):
 @pytest.hookimpl(wrapper=True, tryfirst=True)
 def pytest_runtest_protocol(item):
     active = get_active(item.session)
-    active.request = item._request
+    active.request = _api.get_request(item)
     yield
     active.request = None
 
@@ -88,5 +88,5 @@ def set_active(value):
 
 @dataclass
 class Active:
-    session: Session
-    request: FixtureRequest = field(default=None)
+    session: pytest.Session
+    request: pytest.FixtureRequest = field(default=None)

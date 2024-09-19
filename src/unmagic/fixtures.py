@@ -9,9 +9,8 @@ from os.path import dirname
 from types import GeneratorType
 
 import pytest
-from _pytest.compat import is_generator
-from _pytest.fixtures import getfixturemarker
 
+from . import _api
 from .scope import get_request
 
 __all__ = ["fixture", "use"]
@@ -114,7 +113,7 @@ class UnmagicFixture:
             raise NotImplementedError("TODO test")
         if isinstance(fixture, cls):
             return fixture
-        if getfixturemarker(fixture) is not None:
+        if _api.getfixturemarker(fixture) is not None:
             def func():
                 yield get_fixture_value(fixture.__name__)
             # do not use @wraps(fixture) to prevent pytest from
@@ -176,10 +175,11 @@ class UnmagicFixture:
         return use(self)(function)
 
     def _is_registered_for(self, node):
-        return node.session._fixturemanager.getfixturedefs(self._id, node)
+        return _api.getfixturedefs(node, self._id)
 
     def _register(self, node):
-        node.session._fixturemanager._register_fixture(
+        _api.register_fixture(
+            node.session,
             name=self._id,
             func=self.get_generator(),
             nodeid=_SCOPE_NODE_ID[self.scope](node.nodeid),
@@ -187,7 +187,7 @@ class UnmagicFixture:
         )
 
     def get_generator(self):
-        if is_generator(self.func) and not self.kw:
+        if _api.is_generator(self.func) and not self.kw:
             return self.func
         return _yield_from(self.func, self.kw)
 

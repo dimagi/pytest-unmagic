@@ -2,7 +2,7 @@
 import warnings
 from contextlib import contextmanager
 
-from _pytest import fixtures as pytest_fixtures
+from . import _api
 
 _fences = [set()]
 
@@ -25,9 +25,10 @@ def install(names=(), reset=False):
 
 
 def pytest_runtest_call(item):
-    if _has_magic_fixtures(item.obj, item._fixtureinfo.argnames, item):
-        names = ", ".join(item._fixtureinfo.argnames)
-        warnings.warn(f"{item._nodeid} used magic fixture(s): {names}")
+    argnames = _api.get_arg_names(item)
+    if _has_magic_fixtures(item.obj, argnames, item):
+        names = ", ".join(argnames)
+        warnings.warn(f"{item.nodeid} used magic fixture(s): {names}")
 
 
 def pytest_fixture_setup(fixturedef):
@@ -40,7 +41,7 @@ def pytest_fixture_setup(fixturedef):
 def _has_magic_fixtures(obj, argnames, node):
     if not (is_fenced(obj) and argnames):
         return False
-    args = set(argnames) - pytest_fixtures._get_direct_parametrize_args(node)
+    args = set(argnames) - _api.get_direct_parametrize_args(node)
     args.discard("request")
     return args
 
