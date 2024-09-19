@@ -1,10 +1,11 @@
 import pytest
 
-from unmagic import autouse, fixture, get_fixture_value
-from .util import get_source
+from unmagic import autouse, fixture, use
+from .util import get_source, unmagic_tester
 
 
-def test_autouse_module_fixture():
+@unmagic_tester
+def test_autouse_module_fixture(pytester):
     @get_source
     def test_py():
         from unmagic import autouse, fixture, use
@@ -32,7 +33,6 @@ def test_autouse_module_fixture():
             yield
             tr.append(name)
 
-    pytester = get_fixture_value("pytester")
     pytester.makepyfile(test_py)
 
     result = pytester.runpytest("-s")
@@ -42,7 +42,8 @@ def test_autouse_module_fixture():
     result.assert_outcomes(passed=3)
 
 
-def test_autouse_package_fixture():
+@unmagic_tester
+def test_autouse_package_fixture(pytester):
     @get_source
     def fix_py():
         from unmagic import fixture
@@ -84,8 +85,6 @@ def test_autouse_package_fixture():
         @use(ss_tracer, modname)
         def test_two(tr, mod):
             tr.append(f"{mod}.t2")
-
-    pytester = get_fixture_value("pytester")
 
     (pytester.path / "pkg/sub").mkdir(parents=True)
     (pytester.path / "pkg/sub/__init__.py").write_text(init_py)

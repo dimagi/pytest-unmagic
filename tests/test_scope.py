@@ -1,9 +1,8 @@
-from unmagic import get_fixture_value
-
-from .util import get_source
+from .util import get_source, unmagic_tester
 
 
-def test_no_active_session_error():
+@unmagic_tester
+def test_no_active_session_error(pytester):
     @get_source
     def conftest():
         import pytest
@@ -24,7 +23,6 @@ def test_no_active_session_error():
         def test():
             assert calls == ["configure"]
 
-    pytester = get_fixture_value("pytester")
     pytester.makeconftest(conftest)
     pytester.makepyfile(test_py)
 
@@ -32,7 +30,8 @@ def test_no_active_session_error():
     result.assert_outcomes(passed=1)
 
 
-def test_no_active_request_error():
+@unmagic_tester
+def test_no_active_request_error(pytester):
     @get_source
     def conftest():
         import pytest
@@ -53,7 +52,6 @@ def test_no_active_request_error():
         def test():
             assert calls == ["run"]
 
-    pytester = get_fixture_value("pytester")
     pytester.makeconftest(conftest)
     pytester.makepyfile(test_py)
 

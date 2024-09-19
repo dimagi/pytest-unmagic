@@ -7,7 +7,7 @@ from _pytest.outcomes import Failed
 
 from unmagic import fence, fixture, get_fixture_value, pytest_request, use
 
-from .util import get_source
+from .util import get_source, unmagic_tester
 
 
 @fixture
@@ -157,7 +157,8 @@ def test_get_fixture_value_with_unmagic_fixture():
         get_fixture_value(tracer)
 
 
-def test_fixture_get_value():
+@unmagic_tester
+def test_fixture_get_value(pytester):
     @get_source
     def test_py():
         from unmagic import fixture, use
@@ -188,7 +189,6 @@ def test_fixture_get_value():
             val = mod_fix.get_value()
             assert val == "mod"
 
-    pytester = get_fixture_value("pytester")
     pytester.makepyfile(test_py)
     result = pytester.runpytest("-sl", "--tb=long", "--setup-show")
     result.stdout.fnmatch_lines([
@@ -204,7 +204,8 @@ class TestMethodUse:
         traces.append("done")
 
 
-def test_class_and_session_scope():
+@unmagic_tester
+def test_class_and_session_scope(pytester):
     @get_source
     def test_py():
         from unmagic import fixture, pytest_request, use
@@ -249,7 +250,6 @@ def test_class_and_session_scope():
             def test_three(self, tr):
                 tr.append("y3")
 
-    pytester = get_fixture_value("pytester")
     pytester.makepyfile(test_py)
     result = pytester.runpytest("-s")
     result.stdout.fnmatch_lines([
@@ -258,7 +258,8 @@ def test_class_and_session_scope():
     result.assert_outcomes(passed=6)
 
 
-def test_module_scope():
+@unmagic_tester
+def test_module_scope(pytester):
     @get_source
     def fix_py():
         from unmagic import fixture, pytest_request, use
@@ -311,7 +312,6 @@ def test_module_scope():
         def test_three(tr):
             tr.append("y3")
 
-    pytester = get_fixture_value("pytester")
     pytester.makepyfile(fix=fix_py, test_mod1=mod1_py, test_mod2=mod2_py)
 
     result = pytester.runpytest("-s")
@@ -321,7 +321,8 @@ def test_module_scope():
     result.assert_outcomes(passed=6)
 
 
-def test_package_scope():
+@unmagic_tester
+def test_package_scope(pytester):
     @get_source
     def fix_py():
         from unmagic import fixture
@@ -364,7 +365,6 @@ def test_package_scope():
         def test_two(tr, mod):
             tr.append(f"{mod}.t2")
 
-    pytester = get_fixture_value("pytester")
     (pytester.path / "pkg/sub").mkdir(parents=True)
     (pytester.path / "pkg/sub/__init__.py").write_text(init_py)
     (pytester.path / "pkg/sub/test_mod0.py").write_text(mod_py)
@@ -387,7 +387,8 @@ def test_package_scope():
     result.assert_outcomes(passed=8)
 
 
-def test_setup_function():
+@unmagic_tester
+def test_setup_function(pytester):
     @get_source
     def test_py():
         from unmagic import fixture, pytest_request, use
@@ -422,7 +423,6 @@ def test_setup_function():
         def test_x2(tr, ff):
             tr.append(f"x2-{ff}")
 
-    pytester = get_fixture_value("pytester")
     pytester.makepyfile(test_py)
     result = pytester.runpytest("-sl", "--tb=long")
     result.stdout.fnmatch_lines([

@@ -3,7 +3,7 @@ from pytest import fixture
 
 from unmagic import fence
 
-from .util import get_source
+from .util import get_source, unmagic_tester
 
 
 @fixture(scope="module", autouse=True)
@@ -45,6 +45,7 @@ def test_fence_with_str():
         fence.install(__name__)
 
 
+@unmagic_tester
 def test_warning_on_magic_fixture_usage(pytester):
 
     @get_source
