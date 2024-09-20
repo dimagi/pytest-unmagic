@@ -137,11 +137,10 @@ class UnmagicFixture:
                 raise ValueError(f"{fixture} is not a fixture")
         return cls(func, scope, autouse=False)
 
-    def __init__(self, func, scope, autouse, kw=None):
-        self.autouse = autouse
-        self.scope = scope
+    def __init__(self, func, scope, autouse):
         self.func = func
-        self.kw = kw
+        self.scope = scope
+        self.autouse = autouse
         if autouse:
             _autouse(self, autouse)
 
@@ -166,16 +165,7 @@ class UnmagicFixture:
     def __repr__(self):
         return f"<{type(self).__name__} {self.__name__} {hex(hash(self))}>"
 
-    def __call__(self, function=None, /, **kw):
-        if function is None:
-            assert not self.kw, f"{self} has unexpected args: {self.kw}"
-            return type(self)(self.func, self.scope, self.autouse, kw)
-        if kw:
-            raise NotImplementedError(
-                "Applying a fixture to a function with additional fixture "
-                "arguments is not implemented. Please submit a feature "
-                "request if there is a valid use case."
-            )
+    def __call__(self, function):
         return use(self)(function)
 
     def _is_registered_for(self, node):
@@ -196,9 +186,9 @@ class UnmagicFixture:
         )
 
     def get_generator(self):
-        if _api.is_generator(self.func) and not self.kw:
+        if _api.is_generator(self.func):
             return self.func
-        return _yield_from(self.func, self.kw)
+        return _yield_from(self.func)
 
 
 _SCOPE_NODE_ID = {
@@ -215,11 +205,9 @@ def pytest_request():
     yield get_request()
 
 
-def _yield_from(func, kwargs):
+def _yield_from(func):
     @wraps(func)
     def fixture_generator(*args, **kw):
-        if kwargs:
-            kw = kwargs | kw
         gen = func(*args, **kw)
         if not isinstance(gen, GeneratorType):
             raise TypeError(f"fixture {func.__name__!r} does not yield")

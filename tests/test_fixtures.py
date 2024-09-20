@@ -59,32 +59,6 @@ def test_unmagic_fixture_as_decorator(traces, fixed):
         == [tracer, check_done]
 
 
-@fixture
-def addtwo(num=1):
-    yield num + 2
-
-
-@addtwo
-def test_fixture_with_default_arg_value(num):
-    assert num == 3
-
-
-@addtwo(num=40)
-def test_fixture_with_keyword_argument(num):
-    assert num == 42
-
-
-@fixture
-@addtwo(num=2)
-def incr(num, val=0):
-    yield num + val + 1
-
-
-@incr(val=3)
-def test_compound_fixture_with_keyword_argument_as_decorator(num):
-    assert num == 8
-
-
 class Thing:
     x = 0
     y = 4000
@@ -92,22 +66,29 @@ class Thing:
 
 
 @fixture
+def get_things():
+    yield (Thing.x, Thing.y, Thing.z)
+
+
+@fixture
 @use(
-    addtwo(num=700),
-    patch.object(Thing, "z"),
     patch.object(Thing, "x", 2),
+    get_things,
+    patch.object(Thing, "z"),
 )
-def adding_patches(value, zmock):
+def patch_things(xmock, things, zmock):
     assert Thing.x == 2
-    yield value + Thing.y
+    yield things
     assert Thing.z is zmock
 
 
-@adding_patches
+@patch_things
 @patch.object(Thing, "y")
-def test_patch_with_unmagic_fixture(val, mock):
+def test_patch_with_unmagic_fixture(things, mock):
+    # applying fixtures and patches as decorators can have surprising outcomes
     # note: 'mock' argument is second because of the way patch applies args
-    assert val == 4702  # note: adding_patches is setup before patch is applied
+    # note: patch_things is setup before Thing.y patch is applied
+    assert things == (2, 4000, -1)
     assert Thing.y is mock
 
 
