@@ -113,6 +113,71 @@ def test_autouse_package_fixture(pytester):
     result.assert_outcomes(passed=10)
 
 
+@unmagic_tester
+def test_autouse_conftest_fixture(pytester):
+
+    @get_source
+    def test_py():
+        from unmagic import use
+        from conftest import ss_tracer
+
+        @use(ss_tracer)
+        def test_one(tr):
+            tr.append("t1")
+
+        @use(ss_tracer)
+        def test_two(tr):
+            tr.append("t2")
+
+    pytester.makepyfile(conftest=plug_py, test_it=test_py)
+
+    result = pytester.runpytest("-s")
+    result.stdout.fnmatch_lines([" a t1 z a t2 z"])
+    result.assert_outcomes(passed=2)
+
+
+@unmagic_tester
+def test_autouse_plugin_fixture(pytester):
+
+    @get_source
+    def test_py():
+        from unmagic import use
+        from plug import ss_tracer
+
+        @use(ss_tracer)
+        def test_one(tr):
+            tr.append("t1")
+
+        @use(ss_tracer)
+        def test_two(tr):
+            tr.append("t2")
+
+    pytester.makeini('[pytest]\npythonpath = .\n')
+    pytester.makepyfile(plug=plug_py, test_it=test_py)
+
+    result = pytester.runpytest("-s", "-pplug")
+    result.stdout.fnmatch_lines([" a t1 z a t2 z"])
+    result.assert_outcomes(passed=2)
+
+
+@get_source
+def plug_py():
+    from unmagic import fixture, use
+
+    @fixture(scope="session")
+    def ss_tracer():
+        traces = []
+        yield traces
+        print("\n", " ".join(traces))
+
+    @fixture(autouse=True)
+    @use(ss_tracer)
+    def autofix(traces, request):
+        traces.append("a")
+        yield
+        traces.append("z")
+
+
 @fixture
 def fun():
     yield

@@ -36,6 +36,7 @@ def pytest_unconfigure(config):
     set_active(config.stash.get(_previous_active, None))
 
 
+@pytest.hookimpl(trylast=True)
 def pytest_sessionstart(session):
     """Set active session and requests
 
@@ -48,7 +49,9 @@ def pytest_sessionstart(session):
         value.__dict__.update(vars(Active(session)))
         set_active(value)
     """
+    from .autouse import _register_early_autouses
     set_active(Active(session))
+    _register_early_autouses(session)
 
 
 def pytest_sessionfinish():

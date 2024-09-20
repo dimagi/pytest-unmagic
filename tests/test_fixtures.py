@@ -388,6 +388,53 @@ def test_package_scope(pytester):
 
 
 @unmagic_tester
+def test_fixture_autouse(pytester):
+
+    @get_source
+    def fix_py():
+        from unmagic import fixture, pytest_request, use
+
+        @fixture(scope="session")
+        def ss_tracer():
+            traces = []
+            yield traces
+            print("", " ".join(traces))
+
+        @fixture(scope="module", autouse=True)
+        @use(ss_tracer, pytest_request)
+        def mod_fix(traces, request):
+            name = request.module.__name__[-4:]
+            traces.append(f"{name}-a")
+            yield name
+            traces.append(f"{name}-z")
+
+    @get_source
+    def mod_py():
+        from unmagic import use
+        from fix import ss_tracer
+
+        @use(ss_tracer)
+        def test_one(tr):
+            tr.append("x1")
+
+        @use(ss_tracer)
+        def test_two(tr):
+            tr.append("x2")
+
+        @use(ss_tracer)
+        def test_three(tr):
+            tr.append("x3")
+
+    pytester.makepyfile(fix=fix_py, test_mod1=mod_py, test_mod2=mod_py)
+
+    result = pytester.runpytest("-s")
+    result.stdout.fnmatch_lines([
+        "* mod1-a x1 x2 x3 mod1-z mod2-a x1 x2 x3 mod2-z",
+    ])
+    result.assert_outcomes(passed=6)
+
+
+@unmagic_tester
 def test_setup_function(pytester):
     @get_source
     def test_py():

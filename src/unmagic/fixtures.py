@@ -11,12 +11,13 @@ from types import GeneratorType
 import pytest
 
 from . import _api
+from .autouse import autouse as _autouse
 from .scope import get_request
 
 __all__ = ["fixture", "use"]
 
 
-def fixture(func=None, /, scope="function"):
+def fixture(func=None, /, scope="function", autouse=False):
     """Unmagic fixture decorator
 
     The decorated function must `yield` exactly once. The yielded value
@@ -31,7 +32,7 @@ def fixture(func=None, /, scope="function"):
     a lower scope to retrieve the value of the fixture.
     """
     def fixture(func):
-        return UnmagicFixture(func, scope)
+        return UnmagicFixture(func, scope, autouse)
     return fixture if func is None else fixture(func)
 
 
@@ -134,12 +135,15 @@ class UnmagicFixture:
                 func.wrapped = outer
             else:
                 raise ValueError(f"{fixture} is not a fixture")
-        return cls(func, scope)
+        return cls(func, scope, autouse=False)
 
-    def __init__(self, func, scope, kw=None):
+    def __init__(self, func, scope, autouse, kw=None):
+        self.autouse = autouse
         self.scope = scope
         self.func = func
         self.kw = kw
+        if autouse:
+            _autouse(self, autouse)
 
     def get_value(self):
         request = get_request()
@@ -165,7 +169,7 @@ class UnmagicFixture:
     def __call__(self, function=None, /, **kw):
         if function is None:
             assert not self.kw, f"{self} has unexpected args: {self.kw}"
-            return type(self)(self.func, self.scope, kw)
+            return type(self)(self.func, self.scope, self.autouse, kw)
         if kw:
             raise NotImplementedError(
                 "Applying a fixture to a function with additional fixture "
@@ -178,12 +182,17 @@ class UnmagicFixture:
         return _api.getfixturedefs(node, self._id)
 
     def _register(self, node):
+        if self.autouse is True:
+            scope_node_id = ""
+        else:
+            scope_node_id = _SCOPE_NODE_ID[self.scope](node.nodeid)
         _api.register_fixture(
             node.session,
             name=self._id,
             func=self.get_generator(),
-            nodeid=_SCOPE_NODE_ID[self.scope](node.nodeid),
+            nodeid=scope_node_id,
             scope=self.scope,
+            autouse=self.autouse,
         )
 
     def get_generator(self):
