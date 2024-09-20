@@ -1,6 +1,3 @@
-import pytest
-
-from unmagic import autouse, fixture, use
 from .util import get_source, unmagic_tester
 
 
@@ -25,13 +22,14 @@ def test_autouse_module_fixture(pytester):
             yield traces
             print("\n", " ".join(traces))
 
-        @autouse(__file__)
         @fixture
         @use(ss_tracer)
         def test_name(tr, request):
             name = request.node.name.replace("test_", "")
             yield
             tr.append(name)
+
+        autouse(test_name, __file__)
 
     pytester.makepyfile(test_py)
 
@@ -176,14 +174,3 @@ def plug_py():
         traces.append("a")
         yield
         traces.append("z")
-
-
-@fixture
-def fun():
-    yield
-
-
-@pytest.mark.parametrize("value", [None, lambda: None, fun])
-def test_autouse_decorator_error(value):
-    with pytest.raises(ValueError, match="requires a location"):
-        autouse(value)

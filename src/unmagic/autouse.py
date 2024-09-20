@@ -1,4 +1,3 @@
-from functools import partial
 from pathlib import Path
 
 from . import _api
@@ -9,15 +8,12 @@ from .scope import get_active
 _early_autouses = []
 
 
-def autouse(fixture, /, where=None):
+def autouse(fixture, where):
     """Register fixture setup within a qualified scope
 
     The fixture will be set up each time its scope is entered at the
     beginning of or within the qualified scope and torn down at the end
     of its scope.
-
-    When used as a decorator the ``where`` value should be passed as the
-    first argument. For example: ``@autouse(__file__)``
 
     :param fixture: An unmagic fixture.
     :param where: Scope qualifier such as a module's or package's
@@ -25,12 +21,6 @@ def autouse(fixture, /, where=None):
         the qualified scope is run. If ``True``, apply to all tests in
         the session.
     """
-    if where is None:
-        if not isinstance(fixture, str):
-            raise ValueError(
-                f"autouse decorator requires a location (got: {fixture})")
-        return partial(autouse, where=fixture)
-
     active = get_active()
     if active is None:
         _early_autouses.append((fixture, where))
