@@ -92,6 +92,18 @@ autouse(a_fixture, __file__)
 ...
 ```
 
+The value of a fixture can be retrieved within a test function by calling the
+fixture. This is similar to `request.getfixturevalue()`.
+
+```py
+# tests/test_that.py
+from .fixtures import a_fixture
+
+def test_that():
+    value = a_fixture()
+    assert value == 'that'
+```
+
 ### Magic fixture fence
 
 It is possible to errect a fence around tests in a particular module or package

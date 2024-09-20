@@ -28,7 +28,7 @@ def fixture(func=None, /, scope="function", autouse=False):
     A fixture can be assigned a scope. It will be setup for the first
     test that uses it and torn down at the end of its scope.
 
-    The fixture's `get_value()` function can be used within its scope or
+    A fixture can be called without arguments within its scope or
     a lower scope to retrieve the value of the fixture.
     """
     def fixture(func):
@@ -67,7 +67,7 @@ def use(*fixtures):
         @wraps(func)
         def run_with_fixtures(*args, **kw):
             try:
-                fixture_args = [f.get_value() for f in unmagics]
+                fixture_args = [f() for f in unmagics]
                 if args and ismethod(getattr(get_request(), "function", None)):
                     # retain self as first argument
                     fixture_args.insert(0, args[0])
@@ -144,12 +144,6 @@ class UnmagicFixture:
         if autouse:
             _autouse(self, autouse)
 
-    def get_value(self):
-        request = get_request()
-        if not self._is_registered_for(request.node):
-            self._register(request.node)
-        return request.getfixturevalue(self._id)
-
     @cached_property
     def _id(self):
         return f"unmagic-{self.__name__}-{hex(hash(self))[2:]}"
@@ -165,8 +159,16 @@ class UnmagicFixture:
     def __repr__(self):
         return f"<{type(self).__name__} {self.__name__} {hex(hash(self))}>"
 
-    def __call__(self, function):
+    def __call__(self, function=None):
+        if function is None:
+            return self._get_value()
         return use(self)(function)
+
+    def _get_value(self):
+        request = get_request()
+        if not self._is_registered_for(request.node):
+            self._register(request.node)
+        return request.getfixturevalue(self._id)
 
     def _is_registered_for(self, node):
         return _api.getfixturedefs(node, self._id)

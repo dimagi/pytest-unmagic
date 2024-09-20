@@ -130,7 +130,7 @@ def test_malformed_unmagic_fixture(request):
 
 def test_malformed_unmagic_fixture_get_value():
     with pytest.raises(TypeError, match="fixture 'broken_fix' does not yield"):
-        broken_fix.get_value()
+        broken_fix()
 
 
 def test_get_fixture_value_with_unmagic_fixture():
@@ -160,14 +160,14 @@ def test_fixture_get_value(pytester):
 
         @use(ss_tracer)
         def test_x0(tr):
-            val = mod_fix.get_value()
+            val = mod_fix()
             assert val == "mod"
             tr.append("x0")
 
         @use(ss_tracer)
         def test_x1(tr):
             tr.append("x1")
-            val = mod_fix.get_value()
+            val = mod_fix()
             assert val == "mod"
 
     pytester.makepyfile(test_py)
