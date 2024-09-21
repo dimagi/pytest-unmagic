@@ -99,7 +99,7 @@ _N_PARAMS = {
 
 
 class UnmagicFixture:
-    _pytestfixturefunction = True
+    _pytestfixturefunction = ...  # prevent pytest running fixture as test
 
     @classmethod
     def create(cls, fixture, scope="function"):

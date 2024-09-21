@@ -173,6 +173,30 @@ def test_fixture_get_value(pytester):
     result.assert_outcomes(passed=2)
 
 
+@unmagic_tester
+def test_fixture_is_not_a_test(pytester):
+    @get_source
+    def test_py():
+        from unmagic import fixture, use
+
+        @fixture(scope="session")
+        def test_tracer():
+            traces = []
+            yield traces
+            print("", " ".join(traces))
+
+        @use(test_tracer)
+        def test_thing(tr):
+            tr.append("x0")
+
+    pytester.makepyfile(test_py)
+    result = pytester.runpytest("-sv")
+    result.stdout.fnmatch_lines([
+        "* x0",
+    ])
+    result.assert_outcomes(passed=1)
+
+
 class TestMethodUse:
 
     @use(tracer, check_done)
