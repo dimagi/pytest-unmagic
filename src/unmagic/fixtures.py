@@ -2,6 +2,8 @@
 
 Unmagic fixtures use standard Python import semantics, making their
 origins more intuitive.
+
+PYTEST_DONT_REWRITE
 """
 from functools import cached_property, wraps
 from inspect import Parameter, ismethod, signature
@@ -51,6 +53,10 @@ def use(*fixtures):
         raise TypeError("At least one fixture is required")
 
     def apply_fixtures(func):
+        if _api.safe_isclass(func):
+            func.__unmagic_fixtures__ = fixtures
+            return func
+
         @wraps(func)
         def run_with_fixtures(*args, **kw):
             try:
@@ -202,3 +208,26 @@ def _yield_from(func):
             raise TypeError(f"fixture {func.__name__!r} does not yield")
         yield from gen
     return fixture_generator
+
+
+def pytest_pycollect_makeitem(collector, name, obj):
+    # apply class fixtures to test methods
+    if _api.safe_isclass(obj) and collector.istestclass(obj, name):
+        unmagic_fixtures = getattr(obj, "__unmagic_fixtures__", None)
+        if unmagic_fixtures:
+            for key in dir(obj):
+                val = _api.safe_getattr(obj, key, None)
+                if (
+                    not _api.safe_isclass(val)
+                    and collector.istestfunction(val, key)
+                ):
+                    setattr(obj, key, use(*unmagic_fixtures)(val))
+
+
+def pytest_itemcollected(item):
+    # register fixtures
+    fixtures = getattr(item.obj, "unmagic_fixtures", None)
+    if fixtures:
+        for fixture in fixtures:
+            if not fixture._is_registered_for(item):
+                fixture._register(item)

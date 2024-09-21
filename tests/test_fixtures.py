@@ -235,6 +235,60 @@ def test_class_and_session_scope(pytester):
 
 
 @unmagic_tester
+def test_fixture_as_class_decorator(pytester):
+    @get_source
+    def test_py():
+        from unittest import TestCase
+        from unmagic import fixture, pytest_request, use
+
+        traces = []
+
+        @fixture(scope="session")
+        def ss_tracer():
+            yield traces
+            print("", " ".join(traces))
+
+        @fixture(scope="class")
+        @use(pytest_request, ss_tracer)
+        def cls_fix(request):
+            name = request.cls.__name__[-1]
+            traces.append(f"{name}-a")
+            yield name
+            traces.append(f"{name}-z")
+
+        @cls_fix
+        class TestX:
+            def test_one(self, name):
+                traces.append(f"{name}1")
+
+            @use(ss_tracer)
+            def test_two(self, tr, name):
+                tr.append(f"{name}2")
+
+            def test_three(self, name):
+                traces.append(f"{name}3")
+
+        @cls_fix
+        class TestY(TestCase):
+            def test_one(self, name):
+                traces.append(f"{name}1")
+
+            @use(ss_tracer)
+            def test_two(self, tr, name):
+                tr.append(f"{name}2")
+
+            def test_three(self, name):
+                traces.append(f"{name}3")
+
+    pytester.makepyfile(test_py)
+    result = pytester.runpytest("-s")
+    result.stdout.fnmatch_lines([
+        "* X-a X1 X2 X3 X-z Y-a Y1 Y3 Y2 Y-z",
+    ])
+    result.assert_outcomes(passed=6)
+
+
+@unmagic_tester
 def test_module_scope(pytester):
     @get_source
     def fix_py():

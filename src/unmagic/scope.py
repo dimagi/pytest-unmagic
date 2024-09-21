@@ -58,14 +58,6 @@ def pytest_sessionfinish():
     set_active(None)
 
 
-def pytest_itemcollected(item):
-    fixtures = getattr(item.obj, "unmagic_fixtures", None)
-    if fixtures:
-        for fixture in fixtures:
-            if not fixture._is_registered_for(item):
-                fixture._register(item)
-
-
 @pytest.hookimpl(wrapper=True, tryfirst=True)
 def pytest_runtest_protocol(item):
     active = get_active(item.session)

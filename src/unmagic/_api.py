@@ -1,6 +1,8 @@
 # flake8: noqa: F401
 from _pytest.compat import (
     is_generator,
+    safe_getattr,
+    safe_isclass,
 )
 from _pytest.fixtures import (
     _get_direct_parametrize_args as get_direct_parametrize_args,

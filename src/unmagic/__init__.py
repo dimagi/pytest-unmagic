@@ -9,4 +9,4 @@ from .fixtures import fixture, pytest_request, use
 __version__ = "1.0.0"
 __all__ = ["autouse", "fixture", "pytest_request", "use"]
 
-pytest_plugins = ["unmagic.fence", "unmagic.scope"]
+pytest_plugins = ["unmagic.fence", "unmagic.fixtures", "unmagic.scope"]

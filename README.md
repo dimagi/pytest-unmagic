@@ -48,6 +48,26 @@ def test_world(traces):
     traces.append("hello")
 ```
 
+### Applying fixtures to test classes
+
+The `@use` decorator may be used apply fixtures to test classes, which applies
+the fixture(s) to every test in the class.
+
+```py
+@use(tracer)
+class TestClass:
+    def test_galaxy(self, traces):
+        traces.append("Is anybody out there?")
+```
+
+Fixtures applied to the class are passed as positional test arguments after
+arguments of fixtures applied directly to the test method.
+
+#### Unmagic fixtures on `unittest.TestCase` tests
+
+Unlike standard pytest fixtures, unmagic fixtures can be applied directly to
+`unittest.TestCase` tests.
+
 ### Fixture scope
 
 Fixtures may declare a `scope` of `'function'` (the default), `'class'`,
