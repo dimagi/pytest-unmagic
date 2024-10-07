@@ -88,6 +88,8 @@ def use(*fixtures):
                 for fix in unmagics
                 for sub in getattr(fix, "unmagic_fixtures", [])
                 if sub not in seen and (seen.add(sub) or True)]
+        if hasattr(func, "unmagic_fixtures"):
+            subs.extend(f for f in func.unmagic_fixtures if f not in seen)
         run_with_fixtures.unmagic_fixtures = subs + unmagics
 
         # TODO test possible off-by-one error with "self" method parameter

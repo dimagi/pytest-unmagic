@@ -56,7 +56,7 @@ def test_unmagic_fixture_as_decorator(traces, fixed):
     assert traces == ["fixing..."]
     assert fixed == "fixed value"
     assert test_unmagic_fixture_as_decorator.unmagic_fixtures \
-        == [tracer, check_done]
+        == [tracer, fix, check_done]
 
 
 def test_use_generator_should_return_generator():
