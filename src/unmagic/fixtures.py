@@ -48,6 +48,17 @@ def use(*fixtures):
     will not be passed to the decorated function.
 
     Any context manager may be used as a fixture.
+
+    Magic fixtures may be passed to this decorator. Fixture resolution
+    is done using the ``__name__`` attribute of the magic fixture
+    function, so the actual fixture that is invoked will follow normal
+    pytest fixture resolution rules, which looks first in the test
+    module, then in relevant conftest modules, etc. This means that the
+    fixture that is resolved may be an override of or even unrelated to
+    the one that was passed to ``@use(...)``. In the future this may
+    change to use precisely the passed fixture, so it is safest to pass
+    the most specific fixture possible (the override rather than the
+    overridden fixture).
     """
     if not fixtures:
         raise TypeError("At least one fixture is required")
@@ -209,6 +220,7 @@ _SCOPE_NODE_ID = {
 
 @fixture
 def pytest_request():
+    """A fixture that returns the test request"""
     yield get_request()
 
 

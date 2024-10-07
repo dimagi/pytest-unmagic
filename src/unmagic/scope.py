@@ -38,16 +38,16 @@ def pytest_unconfigure(config):
 
 @pytest.hookimpl(trylast=True)
 def pytest_sessionstart(session):
-    """Set active session and requests
+    """Set active session
 
     Other plugins may override the active scope state with a context
-    sensitive object such as a threading.local, for exapmle:
+    sensitive object such as a ``threading.local``, for exapmle:
 
-    def pytest_runtestloop(session):
-        from threading import local
-        value = local()
-        value.__dict__.update(vars(Active(session)))
-        set_active(value)
+        def pytest_runtestloop(session):
+            from threading import local
+            value = local()
+            value.__dict__.update(vars(Active(session)))
+            set_active(value)
     """
     from .autouse import _register_early_autouses
     set_active(Active(session))
@@ -67,6 +67,7 @@ def pytest_runtest_protocol(item):
 
 
 def get_active(session=None):
+    """Get object with active pytest session and request"""
     if session is not None:
         ss = getattr(_active, "session", None)
         if ss is None:
@@ -77,6 +78,7 @@ def get_active(session=None):
 
 
 def set_active(value):
+    """Set object with active pytest session and request"""
     global _active
     _active = value
 

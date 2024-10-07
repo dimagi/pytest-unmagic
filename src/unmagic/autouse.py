@@ -13,7 +13,11 @@ def autouse(fixture, where):
 
     The fixture will be set up each time its scope is entered at the
     beginning of or within the qualified scope and torn down at the end
-    of its scope.
+    of its scope. For example, a class-scoped fixture will be setup and
+    torn down for each test class within a module when the fixture is
+    registered in the module with ``autouse(class_fixture, __file__)``.
+    Autouse within a package can be registered with ``__file__`` in the
+    ``__init__.py`` module of the package.
 
     :param fixture: An unmagic fixture.
     :param where: Scope qualifier such as a module's or package's
