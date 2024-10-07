@@ -5,7 +5,7 @@ import pytest
 from _pytest.capture import capsys
 from _pytest.outcomes import Failed
 
-from unmagic import fence, fixture, pytest_request, use
+from unmagic import _api, fence, fixture, pytest_request, use
 
 from .util import get_source, unmagic_tester
 
@@ -57,6 +57,13 @@ def test_unmagic_fixture_as_decorator(traces, fixed):
     assert fixed == "fixed value"
     assert test_unmagic_fixture_as_decorator.unmagic_fixtures \
         == [tracer, check_done]
+
+
+def test_use_generator_should_return_generator():
+    @use(fix)
+    def gen():
+        yield
+    assert _api.is_generator(gen)
 
 
 class Thing:

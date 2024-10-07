@@ -57,8 +57,7 @@ def use(*fixtures):
             func.__unmagic_fixtures__ = fixtures
             return func
 
-        @wraps(func)
-        def run_with_fixtures(*args, **kw):
+        def get_args(args):
             try:
                 fixture_args = [f() for f in unmagics]
                 if args and ismethod(getattr(get_request(), "function", None)):
@@ -70,7 +69,18 @@ def use(*fixtures):
             except Exception as exc:
                 pytest.fail(f"fixture setup for {func.__name__!r} failed: "
                             f"{type(exc).__name__}: {exc}")
-            return func(*fixture_args, *args, **kw)
+            return fixture_args, args
+
+        if _api.is_generator(func):
+            @wraps(func)
+            def run_with_fixtures(*args, **kw):
+                fixture_args, args = get_args(args)
+                yield from func(*fixture_args, *args, **kw)
+        else:
+            @wraps(func)
+            def run_with_fixtures(*args, **kw):
+                fixture_args, args = get_args(args)
+                return func(*fixture_args, *args, **kw)
 
         unmagics = [UnmagicFixture.create(f) for f in fixtures]
         seen = set(unmagics)
