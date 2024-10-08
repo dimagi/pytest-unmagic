@@ -141,16 +141,16 @@ class UnmagicFixture:
             outer = fixture
             if callable(fixture) and not hasattr(type(fixture), "__enter__"):
                 fixture = fixture()
-            if hasattr(type(fixture), "__enter__"):
-                def func():
-                    with fixture as value:
-                        yield value
-                # do not use @wraps(fixture) to prevent pytest from
-                # introspecting arguments from wrapped function
-                func.__name__ = type(fixture).__name__
-                func.wrapped = outer
-            else:
-                raise ValueError(f"{fixture} is not a fixture")
+            if not hasattr(type(fixture), "__enter__"):
+                raise ValueError(f"{fixture!r} is not a fixture")
+
+            def func():
+                with fixture as value:
+                    yield value
+            # do not use @wraps(fixture) to prevent pytest from
+            # introspecting arguments from wrapped function
+            func.__name__ = type(fixture).__name__
+            func.wrapped = outer
         return cls(func, scope, autouse=False)
 
     def __init__(self, func, scope, autouse):
