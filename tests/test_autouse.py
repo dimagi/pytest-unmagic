@@ -158,6 +158,30 @@ def test_autouse_plugin_fixture(pytester):
     result.assert_outcomes(passed=2)
 
 
+@unmagic_tester
+def test_autouse_warns_in_runtest_phase(pytester):
+
+    @get_source
+    def test_py():
+        from unmagic import autouse, use
+        from conftest import ss_tracer, autofix
+
+        @use(ss_tracer)
+        def test_one(tr):
+            autouse(autofix, True)
+            tr.append("t1")
+
+    conftest = plug_py.replace("(autouse=True)", "")
+    pytester.makepyfile(conftest=conftest, test_it=test_py)
+
+    result = pytester.runpytest("-s")
+    result.stdout.fnmatch_lines([
+        " t1",
+        "*UserWarning: autouse fixture registered while running tests*",
+    ])
+    result.assert_outcomes(passed=1)
+
+
 @get_source
 def plug_py():
     from unmagic import fixture, use

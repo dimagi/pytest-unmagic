@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 
 from . import _api
@@ -30,6 +31,11 @@ def autouse(fixture, where):
         _early_autouses.append((fixture, where))
     else:
         _register_autouse(fixture, where, active.session)
+        if active.request is not None:
+            warnings.warn(
+                "autouse fixture registered while running tests. "
+                "Relevant tests may have already been run."
+            )
 
 
 def _register_early_autouses(session):
