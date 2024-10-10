@@ -205,6 +205,8 @@ class UnmagicFixture:
 
     def _get_value(self):
         request = get_request()
+        if self is pytest_request:
+            return request
         if not self._is_registered_for(request.node):
             self._register(request.node)
         return request.getfixturevalue(self._id)
@@ -244,7 +246,8 @@ _SCOPE_NODE_ID = {
 @fixture
 def pytest_request():
     """A fixture that returns the test request"""
-    yield get_request()
+    assert 0, "should not get here"
+    yield
 
 
 def _yield_from(func):

@@ -66,6 +66,15 @@ def pytest_runtest_protocol(item):
     active.request = None
 
 
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_fixture_setup(request):
+    active = get_active(request.session)
+    parent = active.request
+    active.request = request
+    yield
+    active.request = parent
+
+
 def get_active(session=None):
     """Get object with active pytest session and request"""
     if session is not None:

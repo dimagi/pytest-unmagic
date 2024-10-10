@@ -204,6 +204,47 @@ def test_fixture_is_not_a_test(pytester):
     result.assert_outcomes(passed=1)
 
 
+@unmagic_tester
+def test_improper_fixture_dependency(pytester):
+    @get_source
+    def test_py():
+        from unmagic import fixture
+
+        @fixture
+        def tracer():
+            yield []
+
+        @fixture(scope="class")
+        @tracer
+        def class_tracer(traces):
+            yield traces
+            print("", " ".join(traces))
+
+        @class_tracer
+        def test(tr):
+            assert 0, "should not get here"
+
+    pytester.makepyfile(test_py)
+    result = pytester.runpytest("-sv", "--setup-show")
+    result.stdout.fnmatch_lines([
+        "* tried to access the function scoped fixture tracer "
+        "with a class scoped request *"
+    ])
+    result.assert_outcomes(failed=1)
+
+
+@fixture(scope="module")
+@pytest_request
+def module_request(request):
+    yield request
+
+
+@use(pytest_request, module_request)
+def test_fixture_request(request, mod_req):
+    assert request.scope == "function"
+    assert mod_req.scope == "module"
+
+
 class TestMethodUse:
 
     @use(tracer, check_done)
