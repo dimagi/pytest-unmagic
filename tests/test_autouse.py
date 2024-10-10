@@ -5,7 +5,7 @@ from .util import get_source, unmagic_tester
 def test_autouse_module_fixture(pytester):
     @get_source
     def test_py():
-        from unmagic import autouse, fixture, use
+        from unmagic import autouse, fixture, pytest_request, use
 
         def test_one():
             pass
@@ -23,7 +23,7 @@ def test_autouse_module_fixture(pytester):
             print("\n", " ".join(traces))
 
         @fixture
-        @use(ss_tracer)
+        @use(ss_tracer, pytest_request)
         def test_name(tr, request):
             name = request.node.name.replace("test_", "")
             yield
@@ -54,11 +54,11 @@ def test_autouse_package_fixture(pytester):
 
     @get_source
     def init_py():
-        from unmagic import autouse, fixture, use
+        from unmagic import autouse, fixture, pytest_request, use
         from fix import ss_tracer
 
         @fixture(scope="package")
-        @use(ss_tracer)
+        @use(ss_tracer, pytest_request)
         def pkg_fix(traces, request):
             name = request.node.nodeid.replace("/", ".")
             traces.append(f"{name}-a")
@@ -116,14 +116,13 @@ def test_autouse_conftest_fixture(pytester):
 
     @get_source
     def test_py():
-        from unmagic import use
         from conftest import ss_tracer
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_one(tr):
             tr.append("t1")
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_two(tr):
             tr.append("t2")
 
@@ -139,14 +138,13 @@ def test_autouse_plugin_fixture(pytester):
 
     @get_source
     def test_py():
-        from unmagic import use
         from plug import ss_tracer
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_one(tr):
             tr.append("t1")
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_two(tr):
             tr.append("t2")
 
@@ -163,10 +161,10 @@ def test_autouse_warns_in_runtest_phase(pytester):
 
     @get_source
     def test_py():
-        from unmagic import autouse, use
+        from unmagic import autouse
         from conftest import ss_tracer, autofix
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_one(tr):
             autouse(autofix, True)
             tr.append("t1")
@@ -184,7 +182,7 @@ def test_autouse_warns_in_runtest_phase(pytester):
 
 @get_source
 def plug_py():
-    from unmagic import fixture, use
+    from unmagic import fixture
 
     @fixture(scope="session")
     def ss_tracer():
@@ -193,8 +191,8 @@ def plug_py():
         print("\n", " ".join(traces))
 
     @fixture(autouse=True)
-    @use(ss_tracer)
-    def autofix(traces, request):
+    @ss_tracer
+    def autofix(traces):
         traces.append("a")
         yield
         traces.append("z")

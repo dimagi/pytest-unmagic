@@ -16,14 +16,14 @@ def tracer():
 
 
 @fixture
-@use(tracer)
+@tracer
 def fix(traces):
     traces.append("fixing...")
     yield "fixed value"
     traces.append("fix done")
 
 
-@use(tracer)
+@tracer
 @fixture
 def check_done(traces):
     yield
@@ -60,7 +60,7 @@ def test_unmagic_fixture_as_decorator(traces, fixed):
 
 
 def test_use_generator_should_return_generator():
-    @use(fix)
+    @fix
     def gen():
         yield
     assert _api.is_generator(gen)
@@ -125,9 +125,9 @@ def broken_fix():
     return "nope"
 
 
-@use(pytest_request)
+@pytest_request
 def test_malformed_unmagic_fixture(request):
-    @use(broken_fix)
+    @broken_fix
     def test(value):
         assert 0, "should not get here"
 
@@ -144,7 +144,7 @@ def test_malformed_unmagic_fixture_get_value():
 def test_fixture_get_value(pytester):
     @get_source
     def test_py():
-        from unmagic import fixture, use
+        from unmagic import fixture
 
         @fixture(scope="session")
         def ss_tracer():
@@ -153,20 +153,20 @@ def test_fixture_get_value(pytester):
             print("", " ".join(traces))
 
         @fixture(scope="module")
-        @use(ss_tracer)
+        @ss_tracer
         def mod_fix(traces):
             name = "mod"
             traces.append(f"{name}-a")
             yield name
             traces.append(f"{name}-z")
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_x0(tr):
             val = mod_fix()
             assert val == "mod"
             tr.append("x0")
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_x1(tr):
             tr.append("x1")
             val = mod_fix()
@@ -184,7 +184,7 @@ def test_fixture_get_value(pytester):
 def test_fixture_is_not_a_test(pytester):
     @get_source
     def test_py():
-        from unmagic import fixture, use
+        from unmagic import fixture
 
         @fixture(scope="session")
         def test_tracer():
@@ -192,7 +192,7 @@ def test_fixture_is_not_a_test(pytester):
             yield traces
             print("", " ".join(traces))
 
-        @use(test_tracer)
+        @test_tracer
         def test_thing(tr):
             tr.append("x0")
 
@@ -273,7 +273,7 @@ def test_class_and_session_scope(pytester):
             traces.append(f"{name}-z")
 
         class TestX:
-            @use(ss_tracer)
+            @ss_tracer
             def test_one(self, tr):
                 tr.append("x1")
 
@@ -281,12 +281,12 @@ def test_class_and_session_scope(pytester):
             def test_two(self, tr, fix):
                 tr.append(f"{fix}-x2")
 
-            @use(ss_tracer)
+            @ss_tracer
             def test_three(self, tr):
                 tr.append("x3")
 
         class TestY:
-            @use(ss_tracer)
+            @ss_tracer
             def test_one(self, tr):
                 tr.append("y1")
 
@@ -294,7 +294,7 @@ def test_class_and_session_scope(pytester):
             def test_two(self, tr, fix):
                 tr.append(f"{fix}-y2")
 
-            @use(ss_tracer)
+            @ss_tracer
             def test_three(self, tr):
                 tr.append("y3")
 
@@ -333,7 +333,7 @@ def test_fixture_as_class_decorator(pytester):
             def test_one(self, name):
                 traces.append(f"{name}1")
 
-            @use(ss_tracer)
+            @ss_tracer
             def test_two(self, tr, name):
                 tr.append(f"{name}2")
 
@@ -345,7 +345,7 @@ def test_fixture_as_class_decorator(pytester):
             def test_one(self, name):
                 traces.append(f"{name}1")
 
-            @use(ss_tracer)
+            @ss_tracer
             def test_two(self, tr, name):
                 tr.append(f"{name}2")
 
@@ -418,7 +418,7 @@ def test_module_scope(pytester):
         from unmagic import use
         from fix import ss_tracer, mod_fix
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_one(tr):
             tr.append("x1")
 
@@ -426,7 +426,7 @@ def test_module_scope(pytester):
         def test_two(tr, fix):
             tr.append(f"{fix}-x2")
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_three(tr):
             tr.append("x3")
 
@@ -435,7 +435,7 @@ def test_module_scope(pytester):
         from unmagic import use
         from fix import ss_tracer, mod_fix
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_one(tr):
             tr.append("y1")
 
@@ -443,7 +443,7 @@ def test_module_scope(pytester):
         def test_two(tr, fix):
             tr.append(f"{fix}-y2")
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_three(tr):
             tr.append("y3")
 
@@ -470,11 +470,11 @@ def test_package_scope(pytester):
 
     @get_source
     def init_py():
-        from unmagic import fixture, use
+        from unmagic import fixture
         from fix import ss_tracer
 
         @fixture(scope="package")
-        @use(ss_tracer)
+        @ss_tracer
         def pkg_fix(traces, request):
             name = request.node.nodeid.replace("/", ".")
             traces.append(f"{name}-a")
@@ -488,7 +488,7 @@ def test_package_scope(pytester):
         from . import pkg_fix
 
         @fixture(scope="module")
-        @use(pkg_fix)
+        @pkg_fix
         def modname():
             yield __name__.rsplit(".", 1)[-1].replace("test_mod", "m")
 
@@ -545,18 +545,17 @@ def test_fixture_autouse(pytester):
 
     @get_source
     def mod_py():
-        from unmagic import use
         from fix import ss_tracer
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_one(tr):
             tr.append("x1")
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_two(tr):
             tr.append("x2")
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_three(tr):
             tr.append("x3")
 
@@ -593,11 +592,11 @@ def test_setup_function(pytester):
         def setup_function(tr, ff):
             tr.append("sf")
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_x0(tr):
             tr.append("x0")
 
-        @use(ss_tracer)
+        @ss_tracer
         def test_x1(tr):
             tr.append("x1")
 
