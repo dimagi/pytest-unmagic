@@ -128,8 +128,6 @@ class UnmagicFixture:
 
     @classmethod
     def create(cls, fixture, scope="function"):
-        if scope != "function":
-            raise NotImplementedError("TODO test")
         if isinstance(fixture, cls):
             return fixture
         if _api.getfixturemarker(fixture) is not None:

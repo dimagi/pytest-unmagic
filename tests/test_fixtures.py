@@ -320,6 +320,39 @@ def test_fixture_as_class_decorator(pytester):
 
 
 @unmagic_tester
+def test_non_function_scoped_contextmanager_fixture(pytester):
+    @get_source
+    def test_py():
+        from contextlib import contextmanager
+        from unmagic.fixtures import UnmagicFixture
+
+        traces = []
+
+        @contextmanager
+        def context():
+            traces.append("setup")
+            yield
+            traces.append("teardown")
+            print("", " ".join(traces))
+
+        @UnmagicFixture.create(context, scope="class")
+        class Tests:
+            def test_one(self):
+                traces.append("1")
+
+            def test_two(self):
+                traces.append("2")
+
+            def test_three(self):
+                traces.append("3")
+
+    pytester.makepyfile(test_py)
+    result = pytester.runpytest("-s")
+    result.stdout.fnmatch_lines(["* setup 1 2 3 teardown"])
+    result.assert_outcomes(passed=3)
+
+
+@unmagic_tester
 def test_module_scope(pytester):
     @get_source
     def fix_py():
