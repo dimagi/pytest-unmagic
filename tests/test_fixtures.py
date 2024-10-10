@@ -560,7 +560,7 @@ class TestFixturesOption:
         result = pytester.runpytest("--fixtures")
         result.stdout.re_match_lines([
             r"-* fixtures defined from test_basic -*",
-            r"fix-[0-9a-f]+ -- test_basic.py:4",
+            r"fix -- test_basic.py:4",
             r" +A fixture",
         ])
         result.assert_outcomes()
@@ -589,7 +589,7 @@ class TestFixturesOption:
         result = pytester.runpytest("--fixtures")
         result.stdout.re_match_lines([
             r"-* fixtures defined from test_fixture_uses_fixture -*",
-            r"second-[0-9a-f]+ -- test_fixture_uses_fixture.py:9",
+            r"second -- test_fixture_uses_fixture.py:9",
             r" +Second fixture",
         ])
         result.assert_outcomes()
@@ -607,7 +607,7 @@ class TestFixturesOption:
         pytester.makepyfile(test_py)
         result = pytester.runpytest("--fixtures")
         result.stdout.re_match_lines([
-            r"capsys-[0-9a-f]+ -- \.{3}/_pytest/capture.py:\d+",
+            r"capsys -- \.{3}/_pytest/capture.py:\d+",
             r" +Enable text capturing .+",
         ])
         result.assert_outcomes()
@@ -631,7 +631,7 @@ class TestFixturesOption:
         result = pytester.runpytest("--fixtures")
         result.stdout.re_match_lines([
             r"-* fixtures defined from test_use_contextmanager -*",
-            r"plain_jane-[0-9a-f]+ -- test_use_contextmanager.py:\d+",
+            r"plain_jane -- test_use_contextmanager.py:\d+",
             r" +Plain Jane",
         ])
         result.assert_outcomes()
@@ -650,6 +650,35 @@ class TestFixturesOption:
         result = pytester.runpytest("--fixtures")
         result.stdout.re_match_lines([
             r"-* fixtures defined from unittest.mock -*",
-            r"<patch use\.x>-[0-9a-f]+ -- .+/unittest/mock\.py:\d+",
+            r"<patch use\.x> -- .+/unittest/mock\.py:\d+",
         ])
         result.assert_outcomes()
+
+
+class TestUnmagicFixtureId:
+
+    @fixture
+    def one():
+        pass
+
+    @fixture
+    def two():
+        pass
+
+    def test_str(self):
+        assert str(self.one._id) == "one"
+
+    def test_repr(self):
+        assert repr(self.one._id).startswith("<one ")
+
+    def test_equality(self):
+        assert self.one._id == self.one._id
+        assert self.one._id != self.two._id
+        assert self.one._id != "one"
+        assert "one" != self.one._id
+
+    def test_hash(self):
+        data = {self.one._id: self.one, "one": object()}
+        assert len(data) == 2
+        assert data[self.one._id] is self.one
+        assert data["one"] is not self.one

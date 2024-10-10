@@ -174,7 +174,7 @@ class UnmagicFixture:
 
     @cached_property
     def _id(self):
-        return f"{self.__name__}-{hex(hash(self))[2:]}"
+        return _UnmagicID(self.__name__)
 
     @property
     def unmagic_fixtures(self):
@@ -257,6 +257,22 @@ def _yield_from(func):
             raise TypeError(f"fixture {func.__name__!r} does not yield")
         yield from gen
     return fixture_generator
+
+
+class _UnmagicID(str):
+    __slots__ = ()
+
+    def __eq__(self, other):
+        return self is other
+
+    def __ne__(self, other):
+        return self is not other
+
+    def __hash__(self):
+        return id(self)
+
+    def __repr__(self):
+        return f"<{self} {hex(hash(self))}>"
 
 
 def _pretty_patch(patch):
