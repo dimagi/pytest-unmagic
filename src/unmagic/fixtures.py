@@ -5,10 +5,12 @@ origins more intuitive.
 
 PYTEST_DONT_REWRITE
 """
+from contextlib import _GeneratorContextManager
 from functools import cached_property, wraps
 from inspect import Parameter, ismethod, signature
 from os.path import dirname
 from types import GeneratorType
+from unittest import mock
 
 import pytest
 
@@ -131,26 +133,36 @@ class UnmagicFixture:
         if isinstance(fixture, cls):
             return fixture
         if _api.getfixturemarker(fixture) is not None:
+            @wraps(_api.get_real_func(fixture))
             def func():
                 yield get_request().getfixturevalue(fixture.__name__)
-            # do not use @wraps(fixture) to prevent pytest from
-            # introspecting arguments from wrapped function
-            func.__name__ = fixture.__name__
-            func.wrapped = fixture
+            func.__pytest_wrapped__ = fixture.__pytest_wrapped__
+            func.__unmagic_wrapped__ = fixture
         else:
             outer = fixture
             if callable(fixture) and not hasattr(type(fixture), "__enter__"):
                 fixture = fixture()
             if not hasattr(type(fixture), "__enter__"):
                 raise ValueError(f"{fixture!r} is not a fixture")
+            if isinstance(fixture, _GeneratorContextManager):
+                # special case for contextmanager
+                inner = wrapped = fixture.func
+            else:
+                if isinstance(fixture, mock._patch):
+                    inner = _pretty_patch(fixture)
+                else:
+                    inner = type(fixture)
+                wrapped = inner.__enter__  # must be a function
 
+            @wraps(inner)
             def func():
                 with fixture as value:
                     yield value
-            # do not use @wraps(fixture) to prevent pytest from
-            # introspecting arguments from wrapped function
-            func.__name__ = type(fixture).__name__
-            func.wrapped = outer
+            func.__pytest_wrapped__ = _api.Wrapper(wrapped)
+            func.__unmagic_wrapped__ = outer
+        # delete __wrapped__ to prevent pytest from
+        # introspecting arguments from wrapped function
+        del func.__wrapped__
         return cls(func, scope, autouse=False)
 
     def __init__(self, func, scope, autouse):
@@ -162,15 +174,28 @@ class UnmagicFixture:
 
     @cached_property
     def _id(self):
-        return f"unmagic-{self.__name__}-{hex(hash(self))[2:]}"
+        return f"{self.__name__}-{hex(hash(self))[2:]}"
 
     @property
     def unmagic_fixtures(self):
         return getattr(self.func, "unmagic_fixtures")
 
     @property
+    def __pytest_wrapped__(self):
+        wrapped = getattr(self.func, "__pytest_wrapped__", None)
+        return _api.Wrapper(self.func) if wrapped is None else wrapped
+
+    @property
     def __name__(self):
         return self.func.__name__
+
+    @property
+    def __doc__(self):
+        return self.func.__doc__
+
+    @property
+    def __module__(self):
+        return self.func.__module__
 
     def __repr__(self):
         return f"<{type(self).__name__} {self.__name__} {hex(hash(self))}>"
@@ -232,6 +257,16 @@ def _yield_from(func):
             raise TypeError(f"fixture {func.__name__!r} does not yield")
         yield from gen
     return fixture_generator
+
+
+def _pretty_patch(patch):
+    @wraps(type(patch))
+    def func():
+        pass
+    target = patch.getter()
+    src = getattr(target, "__name__", repr(target))
+    func.__name__ = f"<patch {src}.{patch.attribute}>"
+    return func
 
 
 def pytest_pycollect_makeitem(collector, name, obj):
