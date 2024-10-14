@@ -176,7 +176,7 @@ class UnmagicFixture:
 
     @property
     def unmagic_fixtures(self):
-        return getattr(self.func, "unmagic_fixtures")
+        return self.func.unmagic_fixtures
 
     @property
     def __pytest_wrapped__(self):
