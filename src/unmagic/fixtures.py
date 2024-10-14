@@ -36,19 +36,6 @@ def fixture(func=None, /, scope="function", autouse=False):
     return fixture if func is None else fixture(func)
 
 
-def get_fixture_value(name):
-    """Get magic fixture value
-
-    The fixture will be set up if necessary, and will be torn down
-    at the end of its scope.
-
-    The 'unmagic' plugin must be active for this to work.
-    """
-    if not isinstance(name, str):
-        raise ValueError("magic fixture name must be a string")
-    return get_request().getfixturevalue(name)
-
-
 def use(*fixtures):
     """Apply fixture(s) to a function
 
@@ -116,7 +103,7 @@ class UnmagicFixture:
             return fixture
         if _api.getfixturemarker(fixture) is not None:
             def func():
-                yield get_fixture_value(fixture.__name__)
+                yield get_request().getfixturevalue(fixture.__name__)
             # do not use @wraps(fixture) to prevent pytest from
             # introspecting arguments from wrapped function
             func.__name__ = fixture.__name__

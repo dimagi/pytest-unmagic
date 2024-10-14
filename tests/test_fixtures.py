@@ -5,7 +5,7 @@ import pytest
 from _pytest.capture import capsys
 from _pytest.outcomes import Failed
 
-from unmagic import fence, fixture, get_fixture_value, pytest_request, use
+from unmagic import fence, fixture, pytest_request, use
 
 from .util import get_source, unmagic_tester
 
@@ -131,11 +131,6 @@ def test_malformed_unmagic_fixture(request):
 def test_malformed_unmagic_fixture_get_value():
     with pytest.raises(TypeError, match="fixture 'broken_fix' does not yield"):
         broken_fix()
-
-
-def test_get_fixture_value_with_unmagic_fixture():
-    with pytest.raises(ValueError, match="name must be a string"):
-        get_fixture_value(tracer)
 
 
 @unmagic_tester
