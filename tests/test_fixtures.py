@@ -2,10 +2,10 @@ from contextlib import contextmanager
 from unittest.mock import patch
 
 import pytest
-from _pytest.capture import capsys
 from _pytest.outcomes import Failed
 
 from unmagic import _api, fence, fixture, pytest_request, use
+from unmagic.fixtures import UnmagicFixture
 
 from .util import get_source, unmagic_tester
 
@@ -17,7 +17,8 @@ def tracer():
 
 @fixture
 @tracer
-def fix(traces):
+def fix():
+    traces = tracer()
     traces.append("fixing...")
     yield "fixed value"
     traces.append("fix done")
@@ -25,36 +26,31 @@ def fix(traces):
 
 @tracer
 @fixture
-def check_done(traces):
+def check_done():
+    traces = tracer()
     yield
     assert traces[-1].endswith("done")
 
 
 @use(check_done, fix, tracer)
-def test_unmagic_fixture(_, fixed, traces):
-    assert fixed == "fixed value"
-    assert traces == ["fixing..."]
+def test_unmagic_fixture():
+    assert fix() == "fixed value"
+    assert tracer() == ["fixing..."]
     assert test_unmagic_fixture.unmagic_fixtures == [check_done, fix, tracer]
 
 
-@use(tracer, check_done)
-def test_unmagic_fixture_with_more_fixtures_than_args(traces):
-    traces.append("done")
-
-
 @pytest.mark.parametrize("p1, p2", [(1, 2), (2, 3)])
-@use(tracer, check_done)
-def test_params(traces, _, p1, p2):
+@check_done
+def test_params(p1, p2):
     assert p1 + 1 == p2
-    traces.append("done")
+    tracer().append("done")
 
 
 @check_done
 @fix
-@tracer
-def test_unmagic_fixture_as_decorator(traces, fixed):
-    assert traces == ["fixing..."]
-    assert fixed == "fixed value"
+def test_unmagic_fixture_as_decorator():
+    assert tracer() == ["fixing..."]
+    assert fix() == "fixed value"
     assert test_unmagic_fixture_as_decorator.unmagic_fixtures \
         == [tracer, fix, check_done]
 
@@ -73,30 +69,17 @@ class Thing:
 
 
 @fixture
-def get_things():
+@use(
+    patch.object(Thing, "x", 2),
+    patch.object(Thing, "z", -2),
+)
+def patch_things():
     yield (Thing.x, Thing.y, Thing.z)
 
 
-@fixture
-@use(
-    patch.object(Thing, "x", 2),
-    get_things,
-    patch.object(Thing, "z"),
-)
-def patch_things(xmock, things, zmock):
-    assert Thing.x == 2
-    yield things
-    assert Thing.z is zmock
-
-
-@patch_things
 @patch.object(Thing, "y")
-def test_patch_with_unmagic_fixture(things, mock):
-    # applying fixtures and patches as decorators can have surprising outcomes
-    # note: 'mock' argument is second because of the way patch applies args
-    # note: patch_things is setup before Thing.y patch is applied
-    assert things == (2, 4000, -1)
-    assert Thing.y is mock
+def test_patch_with_unmagic_fixture(mock):
+    assert patch_things() == (2, mock, -2)
 
 
 @contextmanager
@@ -104,17 +87,17 @@ def plain_context():
     yield "other"
 
 
-@use(plain_context)
-def test_plain_contextmanager_fixture(other):
-    assert other == "other"
+def test_plain_contextmanager_fixture():
+    other_fixture = UnmagicFixture.create(plain_context)
+    assert other_fixture() == "other"
 
 
 def test_module_is_fenced():
     assert fence.is_fenced(test_module_is_fenced)
 
 
-@use(capsys)
-def test_use_magic_fixture(cap):
+def test_use_magic_fixture():
+    cap = pytest_request().getfixturevalue("capsys")
     print("hello")
     captured = cap.readouterr()
     assert captured.out == "hello\n"
@@ -125,14 +108,13 @@ def broken_fix():
     return "nope"
 
 
-@pytest_request
-def test_malformed_unmagic_fixture(request):
+def test_malformed_unmagic_fixture():
     @broken_fix
-    def test(value):
+    def test():
         assert 0, "should not get here"
 
     with pytest.raises(Failed, match="fixture 'broken_fix' does not yield"):
-        test(request=request)
+        test()
 
 
 def test_malformed_unmagic_fixture_get_value():
@@ -140,48 +122,7 @@ def test_malformed_unmagic_fixture_get_value():
         broken_fix()
 
 
-@unmagic_tester
-def test_fixture_get_value(pytester):
-    @get_source
-    def test_py():
-        from unmagic import fixture
-
-        @fixture(scope="session")
-        def ss_tracer():
-            traces = []
-            yield traces
-            print("", " ".join(traces))
-
-        @fixture(scope="module")
-        @ss_tracer
-        def mod_fix(traces):
-            name = "mod"
-            traces.append(f"{name}-a")
-            yield name
-            traces.append(f"{name}-z")
-
-        @ss_tracer
-        def test_x0(tr):
-            val = mod_fix()
-            assert val == "mod"
-            tr.append("x0")
-
-        @ss_tracer
-        def test_x1(tr):
-            tr.append("x1")
-            val = mod_fix()
-            assert val == "mod"
-
-    pytester.makepyfile(test_py)
-    result = pytester.runpytest("-sl", "--tb=long", "--setup-show")
-    result.stdout.fnmatch_lines([
-        "* mod-a x0 x1 mod-z",
-    ])
-    result.assert_outcomes(passed=2)
-
-
-@unmagic_tester
-def test_fixture_is_not_a_test(pytester):
+def test_fixture_is_not_a_test():
     @get_source
     def test_py():
         from unmagic import fixture
@@ -192,10 +133,10 @@ def test_fixture_is_not_a_test(pytester):
             yield traces
             print("", " ".join(traces))
 
-        @test_tracer
-        def test_thing(tr):
-            tr.append("x0")
+        def test_thing():
+            test_tracer().append("x0")
 
+    pytester = unmagic_tester()
     pytester.makepyfile(test_py)
     result = pytester.runpytest("-sv")
     result.stdout.fnmatch_lines([
@@ -204,8 +145,7 @@ def test_fixture_is_not_a_test(pytester):
     result.assert_outcomes(passed=1)
 
 
-@unmagic_tester
-def test_improper_fixture_dependency(pytester):
+def test_improper_fixture_dependency():
     @get_source
     def test_py():
         from unmagic import fixture
@@ -215,15 +155,16 @@ def test_improper_fixture_dependency(pytester):
             yield []
 
         @fixture(scope="class")
-        @tracer
-        def class_tracer(traces):
+        def class_tracer():
+            traces = tracer()
             yield traces
             print("", " ".join(traces))
 
         @class_tracer
-        def test(tr):
+        def test():
             assert 0, "should not get here"
 
+    pytester = unmagic_tester()
     pytester.makepyfile(test_py)
     result = pytester.runpytest("-sv", "--setup-show")
     result.stdout.fnmatch_lines([
@@ -234,29 +175,26 @@ def test_improper_fixture_dependency(pytester):
 
 
 @fixture(scope="module")
-@pytest_request
-def module_request(request):
-    yield request
+def module_request():
+    yield pytest_request()
 
 
-@use(pytest_request, module_request)
-def test_fixture_request(request, mod_req):
-    assert request.scope == "function"
-    assert mod_req.scope == "module"
+def test_fixture_request():
+    assert pytest_request().scope == "function"
+    assert module_request().scope == "module"
 
 
 class TestMethodUse:
 
-    @use(tracer, check_done)
-    def test_use(self, traces):
-        traces.append("done")
+    @check_done
+    def test_use(self):
+        tracer().append("done")
 
 
-@unmagic_tester
-def test_class_and_session_scope(pytester):
+def test_class_and_session_scope():
     @get_source
     def test_py():
-        from unmagic import fixture, pytest_request, use
+        from unmagic import fixture, pytest_request
 
         @fixture(scope="session")
         def ss_tracer():
@@ -265,39 +203,34 @@ def test_class_and_session_scope(pytester):
             print("", " ".join(traces))
 
         @fixture(scope="class")
-        @use(pytest_request, ss_tracer)
-        def cls_fix(request, traces):
-            name = request.cls.__name__[-1]
+        def cls_fix():
+            name = pytest_request().cls.__name__[-1]
+            traces = ss_tracer()
             traces.append(f"{name}-a")
             yield name
             traces.append(f"{name}-z")
 
         class TestX:
-            @ss_tracer
-            def test_one(self, tr):
-                tr.append("x1")
+            def test_one(self):
+                ss_tracer().append("x1")
 
-            @use(ss_tracer, cls_fix)
-            def test_two(self, tr, fix):
-                tr.append(f"{fix}-x2")
+            def test_two(self):
+                ss_tracer().append(f"{cls_fix()}-x2")
 
-            @ss_tracer
-            def test_three(self, tr):
-                tr.append("x3")
+            def test_three(self):
+                ss_tracer().append("x3")
 
         class TestY:
-            @ss_tracer
-            def test_one(self, tr):
-                tr.append("y1")
+            def test_one(self):
+                ss_tracer().append("y1")
 
-            @use(ss_tracer, cls_fix)
-            def test_two(self, tr, fix):
-                tr.append(f"{fix}-y2")
+            def test_two(self):
+                ss_tracer().append(f"{cls_fix()}-y2")
 
-            @ss_tracer
-            def test_three(self, tr):
-                tr.append("y3")
+            def test_three(self):
+                ss_tracer().append("y3")
 
+    pytester = unmagic_tester()
     pytester.makepyfile(test_py)
     result = pytester.runpytest("-s")
     result.stdout.fnmatch_lines([
@@ -306,12 +239,11 @@ def test_class_and_session_scope(pytester):
     result.assert_outcomes(passed=6)
 
 
-@unmagic_tester
-def test_fixture_as_class_decorator(pytester):
+def test_fixture_as_class_decorator():
     @get_source
     def test_py():
         from unittest import TestCase
-        from unmagic import fixture, pytest_request, use
+        from unmagic import fixture, pytest_request
 
         traces = []
 
@@ -321,37 +253,36 @@ def test_fixture_as_class_decorator(pytester):
             print("", " ".join(traces))
 
         @fixture(scope="class")
-        @use(pytest_request, ss_tracer)
-        def cls_fix(request):
-            name = request.cls.__name__[-1]
+        @ss_tracer
+        def cls_fix():
+            name = pytest_request().cls.__name__[-1]
             traces.append(f"{name}-a")
             yield name
             traces.append(f"{name}-z")
 
         @cls_fix
         class TestX:
-            def test_one(self, name):
-                traces.append(f"{name}1")
+            def test_one(self):
+                traces.append("X1")
 
-            @ss_tracer
-            def test_two(self, tr, name):
-                tr.append(f"{name}2")
+            def test_two(self):
+                traces.append("X2")
 
-            def test_three(self, name):
-                traces.append(f"{name}3")
+            def test_three(self):
+                traces.append("X3")
 
         @cls_fix
         class TestY(TestCase):
-            def test_one(self, name):
-                traces.append(f"{name}1")
+            def test_one(self):
+                traces.append("Y1")
 
-            @ss_tracer
-            def test_two(self, tr, name):
-                tr.append(f"{name}2")
+            def test_two(self):
+                traces.append("Y2")
 
-            def test_three(self, name):
-                traces.append(f"{name}3")
+            def test_three(self):
+                traces.append("Y3")
 
+    pytester = unmagic_tester()
     pytester.makepyfile(test_py)
     result = pytester.runpytest("-s")
     result.stdout.fnmatch_lines([
@@ -360,8 +291,7 @@ def test_fixture_as_class_decorator(pytester):
     result.assert_outcomes(passed=6)
 
 
-@unmagic_tester
-def test_non_function_scoped_contextmanager_fixture(pytester):
+def test_non_function_scoped_contextmanager_fixture():
     @get_source
     def test_py():
         from contextlib import contextmanager
@@ -387,17 +317,17 @@ def test_non_function_scoped_contextmanager_fixture(pytester):
             def test_three(self):
                 traces.append("3")
 
+    pytester = unmagic_tester()
     pytester.makepyfile(test_py)
     result = pytester.runpytest("-s")
     result.stdout.fnmatch_lines(["* setup 1 2 3 teardown"])
     result.assert_outcomes(passed=3)
 
 
-@unmagic_tester
-def test_module_scope(pytester):
+def test_module_scope():
     @get_source
     def fix_py():
-        from unmagic import fixture, pytest_request, use
+        from unmagic import fixture, pytest_request
 
         @fixture(scope="session")
         def ss_tracer():
@@ -406,49 +336,41 @@ def test_module_scope(pytester):
             print("", " ".join(traces))
 
         @fixture(scope="module")
-        @use(ss_tracer, pytest_request)
-        def mod_fix(traces, request):
-            name = request.module.__name__[-4:]
+        def mod_fix():
+            name = pytest_request().module.__name__[-4:]
+            traces = ss_tracer()
             traces.append(f"{name}-a")
             yield name
             traces.append(f"{name}-z")
 
     @get_source
     def mod1_py():
-        from unmagic import use
         from fix import ss_tracer, mod_fix
 
-        @ss_tracer
-        def test_one(tr):
-            tr.append("x1")
+        def test_one():
+            ss_tracer().append("x1")
 
-        @use(ss_tracer, mod_fix)
-        def test_two(tr, fix):
-            tr.append(f"{fix}-x2")
+        def test_two():
+            ss_tracer().append(f"{mod_fix()}-x2")
 
-        @ss_tracer
-        def test_three(tr):
-            tr.append("x3")
+        def test_three():
+            ss_tracer().append("x3")
 
     @get_source
     def mod2_py():
-        from unmagic import use
         from fix import ss_tracer, mod_fix
 
-        @ss_tracer
-        def test_one(tr):
-            tr.append("y1")
+        def test_one():
+            ss_tracer().append("y1")
 
-        @use(ss_tracer, mod_fix)
-        def test_two(tr, fix):
-            tr.append(f"{fix}-y2")
+        def test_two():
+            ss_tracer().append(f"{mod_fix()}-y2")
 
-        @ss_tracer
-        def test_three(tr):
-            tr.append("y3")
+        def test_three():
+            ss_tracer().append("y3")
 
+    pytester = unmagic_tester()
     pytester.makepyfile(fix=fix_py, test_mod1=mod1_py, test_mod2=mod2_py)
-
     result = pytester.runpytest("-s")
     result.stdout.fnmatch_lines([
         "* x1 mod1-a mod1-x2 x3 mod1-z y1 mod2-a mod2-y2 y3 mod2-z",
@@ -456,8 +378,7 @@ def test_module_scope(pytester):
     result.assert_outcomes(passed=6)
 
 
-@unmagic_tester
-def test_package_scope(pytester):
+def test_package_scope():
     @get_source
     def fix_py():
         from unmagic import fixture
@@ -470,20 +391,20 @@ def test_package_scope(pytester):
 
     @get_source
     def init_py():
-        from unmagic import fixture
+        from unmagic import fixture, pytest_request
         from fix import ss_tracer
 
         @fixture(scope="package")
-        @ss_tracer
-        def pkg_fix(traces, request):
-            name = request.node.nodeid.replace("/", ".")
+        def pkg_fix():
+            name = pytest_request().node.nodeid.replace("/", ".")
+            traces = ss_tracer()
             traces.append(f"{name}-a")
             yield
             traces.append(f"{name}-z")
 
     @get_source
     def mod_py():
-        from unmagic import fixture, use
+        from unmagic import fixture
         from fix import ss_tracer
         from . import pkg_fix
 
@@ -492,14 +413,13 @@ def test_package_scope(pytester):
         def modname():
             yield __name__.rsplit(".", 1)[-1].replace("test_mod", "m")
 
-        @use(ss_tracer, modname)
-        def test_one(tr, mod):
-            tr.append(f"{mod}.t1")
+        def test_one():
+            ss_tracer().append(f"{modname()}.t1")
 
-        @use(ss_tracer, modname)
-        def test_two(tr, mod):
-            tr.append(f"{mod}.t2")
+        def test_two():
+            ss_tracer().append(f"{modname()}.t2")
 
+    pytester = unmagic_tester()
     (pytester.path / "pkg/sub").mkdir(parents=True)
     (pytester.path / "pkg/sub/__init__.py").write_text(init_py)
     (pytester.path / "pkg/sub/test_mod0.py").write_text(mod_py)
@@ -522,12 +442,11 @@ def test_package_scope(pytester):
     result.assert_outcomes(passed=8)
 
 
-@unmagic_tester
-def test_fixture_autouse(pytester):
+def test_fixture_autouse():
 
     @get_source
     def fix_py():
-        from unmagic import fixture, pytest_request, use
+        from unmagic import fixture, pytest_request
 
         @fixture(scope="session")
         def ss_tracer():
@@ -536,9 +455,9 @@ def test_fixture_autouse(pytester):
             print("", " ".join(traces))
 
         @fixture(scope="module", autouse=True)
-        @use(ss_tracer, pytest_request)
-        def mod_fix(traces, request):
-            name = request.module.__name__[-4:]
+        def mod_fix():
+            name = pytest_request().module.__name__[-4:]
+            traces = ss_tracer()
             traces.append(f"{name}-a")
             yield name
             traces.append(f"{name}-z")
@@ -547,18 +466,16 @@ def test_fixture_autouse(pytester):
     def mod_py():
         from fix import ss_tracer
 
-        @ss_tracer
-        def test_one(tr):
-            tr.append("x1")
+        def test_one():
+            ss_tracer().append("x1")
 
-        @ss_tracer
-        def test_two(tr):
-            tr.append("x2")
+        def test_two():
+            ss_tracer().append("x2")
 
-        @ss_tracer
-        def test_three(tr):
-            tr.append("x3")
+        def test_three():
+            ss_tracer().append("x3")
 
+    pytester = unmagic_tester()
     pytester.makepyfile(fix=fix_py, test_mod1=mod_py, test_mod2=mod_py)
 
     result = pytester.runpytest("-s")
@@ -568,11 +485,10 @@ def test_fixture_autouse(pytester):
     result.assert_outcomes(passed=6)
 
 
-@unmagic_tester
-def test_setup_function(pytester):
+def test_setup_function():
     @get_source
     def test_py():
-        from unmagic import fixture, pytest_request, use
+        from unmagic import fixture, pytest_request
 
         @fixture(scope="session")
         def ss_tracer():
@@ -581,29 +497,27 @@ def test_setup_function(pytester):
             print("", " ".join(traces))
 
         @fixture
-        @use(ss_tracer, pytest_request)
-        def fun_fix(traces, request):
-            name = f"t{request.function.__name__[-1]}"
+        def fun_fix():
+            name = f"t{pytest_request().function.__name__[-1]}"
+            traces = ss_tracer()
             traces.append(f"{name}-a")
             yield name
             traces.append(f"{name}-z")
 
-        @use(ss_tracer, fun_fix)
-        def setup_function(tr, ff):
-            tr.append("sf")
+        @fun_fix
+        def setup_function():
+            ss_tracer().append("sf")
 
-        @ss_tracer
-        def test_x0(tr):
-            tr.append("x0")
+        def test_x0():
+            ss_tracer().append("x0")
 
-        @ss_tracer
-        def test_x1(tr):
-            tr.append("x1")
+        def test_x1():
+            ss_tracer().append("x1")
 
-        @use(ss_tracer, fun_fix)
-        def test_x2(tr, ff):
-            tr.append(f"x2-{ff}")
+        def test_x2():
+            ss_tracer().append(f"x2-{fun_fix()}")
 
+    pytester = unmagic_tester()
     pytester.makepyfile(test_py)
     result = pytester.runpytest("-sl", "--tb=long")
     result.stdout.fnmatch_lines([
@@ -612,10 +526,9 @@ def test_setup_function(pytester):
     result.assert_outcomes(passed=3)
 
 
-@unmagic_tester
 class TestFixturesOption:
 
-    def test_basic(self, pytester):
+    def test_basic(self):
         @get_source
         def test_py():
             from unmagic import fixture
@@ -629,6 +542,7 @@ class TestFixturesOption:
             def test():
                 pass
 
+        pytester = unmagic_tester()
         pytester.makepyfile(test_py)
         result = pytester.runpytest("--fixtures")
         result.stdout.re_match_lines([
@@ -638,7 +552,7 @@ class TestFixturesOption:
         ])
         result.assert_outcomes()
 
-    def test_fixture_uses_fixture(self, pytester):
+    def test_fixture_uses_fixture(self):
         @get_source
         def test_py():
             from unmagic import fixture
@@ -658,6 +572,7 @@ class TestFixturesOption:
             def test():
                 pass
 
+        pytester = unmagic_tester()
         pytester.makepyfile(test_py)
         result = pytester.runpytest("--fixtures")
         result.stdout.re_match_lines([
@@ -667,7 +582,7 @@ class TestFixturesOption:
         ])
         result.assert_outcomes()
 
-    def test_use_magic_fixture(self, pytester):
+    def test_use_magic_fixture(self):
         @get_source
         def test_py():
             from _pytest.capture import capsys
@@ -677,6 +592,7 @@ class TestFixturesOption:
             def test():
                 pass
 
+        pytester = unmagic_tester()
         pytester.makepyfile(test_py)
         result = pytester.runpytest("--fixtures")
         result.stdout.re_match_lines([
@@ -685,7 +601,7 @@ class TestFixturesOption:
         ])
         result.assert_outcomes()
 
-    def test_use_contextmanager(self, pytester):
+    def test_use_contextmanager(self):
         @get_source
         def test_py():
             from contextlib import contextmanager
@@ -700,6 +616,7 @@ class TestFixturesOption:
             def test():
                 pass
 
+        pytester = unmagic_tester()
         pytester.makepyfile(test_py)
         result = pytester.runpytest("--fixtures")
         result.stdout.re_match_lines([
@@ -709,7 +626,7 @@ class TestFixturesOption:
         ])
         result.assert_outcomes()
 
-    def test_use_patch(self, pytester):
+    def test_use_patch(self):
         @get_source
         def test_py():
             from unittest.mock import patch
@@ -719,6 +636,7 @@ class TestFixturesOption:
             def test():
                 pass
 
+        pytester = unmagic_tester()
         pytester.makepyfile(test_py)
         result = pytester.runpytest("--fixtures")
         result.stdout.re_match_lines([

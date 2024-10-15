@@ -7,7 +7,6 @@ PYTEST_DONT_REWRITE
 """
 from contextlib import _GeneratorContextManager
 from functools import cached_property, wraps
-from inspect import Parameter, ismethod, signature
 from os.path import dirname
 from types import GeneratorType
 from unittest import mock
@@ -43,12 +42,6 @@ def fixture(func=None, /, scope="function", autouse=False):
 def use(*fixtures):
     """Apply fixture(s) to a function
 
-    Fixtures are passed to the function as positional arguments in the
-    same order as they were passed to this decorator factory. Additional
-    arguments passed to decorated functions are applied after fixtures.
-    Fixture values that do not have a corresponding positional argument
-    will not be passed to the decorated function.
-
     Any context manager may be used as a fixture.
 
     Magic fixtures may be passed to this decorator. Fixture resolution
@@ -70,30 +63,24 @@ def use(*fixtures):
             func.__unmagic_fixtures__ = fixtures
             return func
 
-        def get_args(args):
+        def setup_fixtures():
             try:
-                fixture_args = [f() for f in unmagics]
-                if args and ismethod(getattr(get_request(), "function", None)):
-                    # retain self as first argument
-                    fixture_args.insert(0, args[0])
-                    args = args[1:]
-                if len(fixture_args) > num_params:
-                    fixture_args = fixture_args[:num_params]
+                for setup in unmagics:
+                    setup()
             except Exception as exc:
                 pytest.fail(f"fixture setup for {func.__name__!r} failed: "
                             f"{type(exc).__name__}: {exc}")
-            return fixture_args, args
 
         if _api.is_generator(func):
             @wraps(func)
             def run_with_fixtures(*args, **kw):
-                fixture_args, args = get_args(args)
-                yield from func(*fixture_args, *args, **kw)
+                setup_fixtures()
+                yield from func(*args, **kw)
         else:
             @wraps(func)
             def run_with_fixtures(*args, **kw):
-                fixture_args, args = get_args(args)
-                return func(*fixture_args, *args, **kw)
+                setup_fixtures()
+                return func(*args, **kw)
 
         unmagics = [UnmagicFixture.create(f) for f in fixtures]
         seen = set(unmagics)
@@ -105,22 +92,11 @@ def use(*fixtures):
             subs.extend(f for f in func.unmagic_fixtures if f not in seen)
         run_with_fixtures.unmagic_fixtures = subs + unmagics
 
-        # TODO test possible off-by-one error with "self" method parameter
-        sig = signature(func)
-        new_params = list(sig.parameters.values())[len(unmagics):]
-        num_params = sum(_N_PARAMS(p.kind, 0) for p in sig.parameters.values())
-        run_with_fixtures.__signature__ = sig.replace(parameters=new_params)
         if isinstance(func, UnmagicFixture):
             func, scope = func.func, func.scope
             return fixture(run_with_fixtures, scope=scope)
         return run_with_fixtures
     return apply_fixtures
-
-
-_N_PARAMS = {
-    Parameter.POSITIONAL_ONLY: 1,
-    Parameter.POSITIONAL_OR_KEYWORD: 1,
-}.get
 
 
 class UnmagicFixture:

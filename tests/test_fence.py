@@ -45,8 +45,7 @@ def test_fence_with_str():
         fence.install(__name__)
 
 
-@unmagic_tester
-def test_warning_on_magic_fixture_usage(pytester):
+def test_warning_on_magic_fixture_usage():
 
     @get_source
     def test_py():
@@ -71,6 +70,7 @@ def test_warning_on_magic_fixture_usage(pytester):
             assert fixfix == "fixfix"
 
     fn = test_warning_on_magic_fixture_usage.__name__
+    pytester = unmagic_tester()
     pytester.makepyfile(test_py)
     result = pytester.runpytest()
     result.stdout.fnmatch_lines([

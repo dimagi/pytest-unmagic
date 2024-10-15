@@ -1,8 +1,7 @@
 from .util import get_source, unmagic_tester
 
 
-@unmagic_tester
-def test_no_active_session_error(pytester):
+def test_no_active_session_error():
     @get_source
     def conftest():
         import pytest
@@ -23,6 +22,7 @@ def test_no_active_session_error(pytester):
         def test():
             assert calls == ["configure"]
 
+    pytester = unmagic_tester()
     pytester.makeconftest(conftest)
     pytester.makepyfile(test_py)
 
@@ -30,8 +30,7 @@ def test_no_active_session_error(pytester):
     result.assert_outcomes(passed=1)
 
 
-@unmagic_tester
-def test_no_active_request_error(pytester):
+def test_no_active_request_error():
     @get_source
     def conftest():
         import pytest
@@ -40,8 +39,7 @@ def test_no_active_request_error(pytester):
         calls = []
 
         def pytest_runtestloop():
-            with pytest.raises(ValueError,
-                               match="no active request"):
+            with pytest.raises(ValueError, match="no active request"):
                 get_request()
             calls.append("run")
 
@@ -52,6 +50,7 @@ def test_no_active_request_error(pytester):
         def test():
             assert calls == ["run"]
 
+    pytester = unmagic_tester()
     pytester.makeconftest(conftest)
     pytester.makepyfile(test_py)
 

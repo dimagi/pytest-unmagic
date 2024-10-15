@@ -4,8 +4,8 @@ from contextlib import contextmanager
 from unittest.mock import patch
 
 import _pytest.pytester as _pytester
-from unmagic import fixture, use
-from unmagic.scope import get_active, set_active
+from unmagic import fixture
+from unmagic.scope import get_active, get_request, set_active
 
 
 def get_source(func):
@@ -18,10 +18,9 @@ def get_source(func):
 
 
 @fixture
-@use(_pytester.pytester)
-def unmagic_tester(pytester):
+def unmagic_tester():
     with patch.object(_pytester, "main", unmagic_inactive()(_pytester.main)):
-        yield pytester
+        yield get_request().getfixturevalue("pytester")
 
 
 @contextmanager

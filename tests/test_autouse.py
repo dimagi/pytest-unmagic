@@ -1,11 +1,10 @@
 from .util import get_source, unmagic_tester
 
 
-@unmagic_tester
-def test_autouse_module_fixture(pytester):
+def test_autouse_module_fixture():
     @get_source
     def test_py():
-        from unmagic import autouse, fixture, pytest_request, use
+        from unmagic import autouse, fixture, pytest_request
 
         def test_one():
             pass
@@ -23,14 +22,14 @@ def test_autouse_module_fixture(pytester):
             print("\n", " ".join(traces))
 
         @fixture
-        @use(ss_tracer, pytest_request)
-        def test_name(tr, request):
-            name = request.node.name.replace("test_", "")
+        def test_name():
+            name = pytest_request().node.name.replace("test_", "")
             yield
-            tr.append(name)
+            ss_tracer().append(name)
 
         autouse(test_name, __file__)
 
+    pytester = unmagic_tester()
     pytester.makepyfile(test_py)
 
     result = pytester.runpytest("-s")
@@ -40,8 +39,7 @@ def test_autouse_module_fixture(pytester):
     result.assert_outcomes(passed=3)
 
 
-@unmagic_tester
-def test_autouse_package_fixture(pytester):
+def test_autouse_package_fixture():
     @get_source
     def fix_py():
         from unmagic import fixture
@@ -54,13 +52,13 @@ def test_autouse_package_fixture(pytester):
 
     @get_source
     def init_py():
-        from unmagic import autouse, fixture, pytest_request, use
+        from unmagic import autouse, fixture, pytest_request
         from fix import ss_tracer
 
         @fixture(scope="package")
-        @use(ss_tracer, pytest_request)
-        def pkg_fix(traces, request):
-            name = request.node.nodeid.replace("/", ".")
+        def pkg_fix():
+            name = pytest_request().node.nodeid.replace("/", ".")
+            traces = ss_tracer()
             traces.append(f"{name}-a")
             yield
             traces.append(f"{name}-z")
@@ -69,21 +67,20 @@ def test_autouse_package_fixture(pytester):
 
     @get_source
     def mod_py():
-        from unmagic import fixture, use
+        from unmagic import fixture
         from fix import ss_tracer
 
         @fixture
         def modname():
             yield __name__.rsplit(".", 1)[-1].replace("test_mod", "m")
 
-        @use(ss_tracer, modname)
-        def test_one(tr, mod):
-            tr.append(f"{mod}.t1")
+        def test_one():
+            ss_tracer().append(f"{modname()}.t1")
 
-        @use(ss_tracer, modname)
-        def test_two(tr, mod):
-            tr.append(f"{mod}.t2")
+        def test_two():
+            ss_tracer().append(f"{modname()}.t2")
 
+    pytester = unmagic_tester()
     (pytester.path / "pkg/sub").mkdir(parents=True)
     (pytester.path / "pkg/sub/__init__.py").write_text(init_py)
     (pytester.path / "pkg/sub/test_mod0.py").write_text(mod_py)
@@ -111,21 +108,19 @@ def test_autouse_package_fixture(pytester):
     result.assert_outcomes(passed=10)
 
 
-@unmagic_tester
-def test_autouse_conftest_fixture(pytester):
+def test_autouse_conftest_fixture():
 
     @get_source
     def test_py():
         from conftest import ss_tracer
 
-        @ss_tracer
-        def test_one(tr):
-            tr.append("t1")
+        def test_one():
+            ss_tracer().append("t1")
 
-        @ss_tracer
-        def test_two(tr):
-            tr.append("t2")
+        def test_two():
+            ss_tracer().append("t2")
 
+    pytester = unmagic_tester()
     pytester.makepyfile(conftest=plug_py, test_it=test_py)
 
     result = pytester.runpytest("-s")
@@ -133,21 +128,19 @@ def test_autouse_conftest_fixture(pytester):
     result.assert_outcomes(passed=2)
 
 
-@unmagic_tester
-def test_autouse_plugin_fixture(pytester):
+def test_autouse_plugin_fixture():
 
     @get_source
     def test_py():
         from plug import ss_tracer
 
-        @ss_tracer
-        def test_one(tr):
-            tr.append("t1")
+        def test_one():
+            ss_tracer().append("t1")
 
-        @ss_tracer
-        def test_two(tr):
-            tr.append("t2")
+        def test_two():
+            ss_tracer().append("t2")
 
+    pytester = unmagic_tester()
     pytester.makeini('[pytest]\npythonpath = .\n')
     pytester.makepyfile(plug=plug_py, test_it=test_py)
 
@@ -156,20 +149,19 @@ def test_autouse_plugin_fixture(pytester):
     result.assert_outcomes(passed=2)
 
 
-@unmagic_tester
-def test_autouse_warns_in_runtest_phase(pytester):
+def test_autouse_warns_in_runtest_phase():
 
     @get_source
     def test_py():
         from unmagic import autouse
         from conftest import ss_tracer, autofix
 
-        @ss_tracer
-        def test_one(tr):
+        def test_one():
             autouse(autofix, True)
-            tr.append("t1")
+            ss_tracer().append("t1")
 
     conftest = plug_py.replace("(autouse=True)", "")
+    pytester = unmagic_tester()
     pytester.makepyfile(conftest=conftest, test_it=test_py)
 
     result = pytester.runpytest("-s")
@@ -191,8 +183,8 @@ def plug_py():
         print("\n", " ".join(traces))
 
     @fixture(autouse=True)
-    @ss_tracer
-    def autofix(traces):
+    def autofix():
+        traces = ss_tracer()
         traces.append("a")
         yield
         traces.append("z")

@@ -16,22 +16,23 @@ fixtures or test functions with `unmagic.use`.
 ```py
 from unmagic import fixture, use
 
+traces = []
+
 @fixture
 def tracer():
-    traces = []
-    yield traces
-    assert traces, "expected at least one trace"
+    assert not traces, f"unexpected traces before setup: {traces}"
+    yield
+    traces.clear()
 
 @use(tracer)
-def test_world(traces):
+def test_append():
     traces.append("hello")
+    assert traces, "expected at least one trace"
 ```
 
-A fixture must yield exactly once. The `@use` decorator will apply yielded
-fixture values to the decorated function as positional arguments, which means
-the fixture value may have whatever name is appropriate within the function to
-which it is applied. If there is no positional argument available to receive the
-value then it will not be passed.
+A fixture must yield exactly once. The `@use` decorator causes the fixture to be
+set up and registered for tear down, but does not pass the yielded value to the
+decorated function. This is appropriate for fixtures that have side effects.
 
 The location where a fixture is defined has no affect on where it can be used.
 Any code that can import it can use it.
@@ -44,29 +45,45 @@ could have been written as
 
 ```py
 @tracer
-def test_world(traces):
+def test_append():
     traces.append("hello")
+    assert traces, "expected at least one trace"
 ```
 
 ### Applying fixtures to test classes
 
-The `@use` decorator may be used apply fixtures to test classes, which applies
-the fixture(s) to every test in the class.
+The `@use` decorator can be used on test classes, which applies the fixture(s)
+to every test in the class.
 
 ```py
 @use(tracer)
 class TestClass:
-    def test_galaxy(self, traces):
+    def test_galaxy(self):
         traces.append("Is anybody out there?")
 ```
-
-Fixtures applied to the class are passed as positional test arguments after
-arguments of fixtures applied directly to the test method.
 
 #### Unmagic fixtures on `unittest.TestCase` tests
 
 Unlike standard pytest fixtures, unmagic fixtures can be applied directly to
 `unittest.TestCase` tests.
+
+### Call a fixture to retrieve its value
+
+The value of a fixture can be retrieved within a test function or other fixture
+by calling the fixture. This is similar to `request.getfixturevalue()`.
+
+```py
+@fixture
+def tracer():
+    assert not traces, f"unexpected traces before setup: {traces}"
+    yield traces
+    traces.clear()
+
+def test_append():
+    traces = tracer()
+    traces.append("hello")
+    assert traces, "expected at least one trace"
+```
 
 ### Fixture scope
 
@@ -95,6 +112,14 @@ A single fixture may be registered for autouse in multiple modules and packages
 with ``unmagic.autouse``.
 
 ```py
+# tests/fixtures.py
+from unmagic import fixture
+
+@fixture
+def a_fixture():
+    ...
+
+
 # tests/test_this.py
 from unmagic import autouse
 from .fixtures import a_fixture
@@ -103,6 +128,7 @@ autouse(a_fixture, __file__)
 
 ...
 
+
 # tests/test_that.py
 from unmagic import autouse
 from .fixtures import a_fixture
@@ -110,18 +136,6 @@ from .fixtures import a_fixture
 autouse(a_fixture, __file__)
 
 ...
-```
-
-The value of a fixture can be retrieved within a test function by calling the
-fixture. This is similar to `request.getfixturevalue()`.
-
-```py
-# tests/test_that.py
-from .fixtures import a_fixture
-
-def test_that():
-    value = a_fixture()
-    assert value == 'that'
 ```
 
 ### Magic fixture fence
@@ -144,19 +158,6 @@ This will cause warnings to be emitted for magic fixture usages within
 
 The `pytest_request` fixture provides access to the test request object. Among
 other things, it can be used to retrieve values of pytest fixtures.
-
-```py
-from unmagic import pytest_request, use
-
-@use(pytest_request)
-def test_output(request):
-    capsys = request.getfixturevalue("capsys")
-    print("hello")
-    captured = capsys.readouterr()
-    assert captured.out == "hello\n"
-```
-
-The same could also be written as
 
 ```py
 from unmagic import pytest_request
