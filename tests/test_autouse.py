@@ -4,7 +4,7 @@ from .util import get_source, unmagic_tester
 def test_autouse_module_fixture():
     @get_source
     def test_py():
-        from unmagic import autouse, fixture, pytest_request
+        from unmagic import autouse, fixture, get_request
 
         def test_one():
             pass
@@ -23,7 +23,7 @@ def test_autouse_module_fixture():
 
         @fixture
         def test_name():
-            name = pytest_request().node.name.replace("test_", "")
+            name = get_request().node.name.replace("test_", "")
             yield
             ss_tracer().append(name)
 
@@ -52,12 +52,12 @@ def test_autouse_package_fixture():
 
     @get_source
     def init_py():
-        from unmagic import autouse, fixture, pytest_request
+        from unmagic import autouse, fixture, get_request
         from fix import ss_tracer
 
         @fixture(scope="package")
         def pkg_fix():
-            name = pytest_request().node.nodeid.replace("/", ".")
+            name = get_request().node.nodeid.replace("/", ".")
             traces = ss_tracer()
             traces.append(f"{name}-a")
             yield

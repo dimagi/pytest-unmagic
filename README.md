@@ -154,16 +154,17 @@ This will cause warnings to be emitted for magic fixture usages within
 `mypackage.tests`.
 
 
-### The `pytest_request` fixture
+### Accessing the pytest request object
 
-The `pytest_request` fixture provides access to the test request object. Among
-other things, it can be used to retrieve values of pytest fixtures.
+The `unmagic.get_request()` function provides access to the test request object.
+Among other things, it can be used to retrieve fixtures defined with
+`@pytest.fixture`.
 
 ```py
-from unmagic import pytest_request
+from unmagic import get_request
 
 def test_output():
-    capsys = pytest_request().getfixturevalue("capsys")
+    capsys = get_request().getfixturevalue("capsys")
     print("hello")
     captured = capsys.readouterr()
     assert captured.out == "hello\n"
