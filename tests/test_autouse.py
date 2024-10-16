@@ -137,6 +137,37 @@ def test_use_on_autouse_fixture():
     result.assert_outcomes(passed=1)
 
 
+def test_autouse_context_manager():
+    @get_source
+    def test_py():
+        from contextlib import contextmanager
+        from unmagic import fixture
+
+        traces = []
+
+        @contextmanager
+        def context():
+            traces.append("a")
+            yield
+            traces.append("z")
+            print()
+            print(' '.join(traces))
+
+        fixture(context, scope="module", autouse=__file__)
+
+        def test_one():
+            traces.append("1")
+
+        def test_two():
+            traces.append("2")
+
+    pytester = unmagic_tester()
+    pytester.makepyfile(test_py)
+    result = pytester.runpytest("-s")
+    result.stdout.fnmatch_lines(["a 1 2 z"])
+    result.assert_outcomes(passed=2)
+
+
 def test_autouse_conftest_fixture():
 
     @get_source

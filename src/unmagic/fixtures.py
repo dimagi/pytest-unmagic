@@ -35,7 +35,7 @@ def fixture(func=None, /, scope="function", autouse=False):
     """
     def fixture(func):
         if not _api.is_generator(func):
-            return UnmagicFixture.create(func, scope)
+            return UnmagicFixture.create(func, scope, autouse)
         return UnmagicFixture(func, scope, autouse)
     return fixture if func is None else fixture(func)
 
@@ -112,7 +112,7 @@ class UnmagicFixture:
     _pytestfixturefunction = ...  # prevent pytest running fixture as test
 
     @classmethod
-    def create(cls, fixture, scope="function"):
+    def create(cls, fixture, scope="function", autouse=False):
         if isinstance(fixture, cls):
             return fixture
         if _api.getfixturemarker(fixture) is not None:
@@ -149,7 +149,7 @@ class UnmagicFixture:
         # delete __wrapped__ to prevent pytest from
         # introspecting arguments from wrapped function
         del func.__wrapped__
-        return cls(func, scope, autouse=False)
+        return cls(func, scope, autouse)
 
     def __init__(self, func, scope, autouse):
         self.func = func
