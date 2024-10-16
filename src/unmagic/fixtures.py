@@ -8,7 +8,6 @@ PYTEST_DONT_REWRITE
 from contextlib import _GeneratorContextManager
 from functools import cached_property, wraps
 from os.path import dirname
-from types import GeneratorType
 from unittest import mock
 
 import pytest
@@ -35,6 +34,8 @@ def fixture(func=None, /, scope="function", autouse=False):
     a lower scope to retrieve the value of the fixture.
     """
     def fixture(func):
+        if not _api.is_generator(func):
+            return UnmagicFixture.create(func, scope)
         return UnmagicFixture(func, scope, autouse)
     return fixture if func is None else fixture(func)
 
@@ -71,6 +72,10 @@ def use(*fixtures):
                 pytest.fail(f"fixture setup for {func.__name__!r} failed: "
                             f"{type(exc).__name__}: {exc}")
 
+        is_fixture = isinstance(func, UnmagicFixture)
+        if is_fixture:
+            func, scope = func.func, func.scope
+
         if _api.is_generator(func):
             @wraps(func)
             def run_with_fixtures(*args, **kw):
@@ -92,8 +97,7 @@ def use(*fixtures):
             subs.extend(f for f in func.unmagic_fixtures if f not in seen)
         run_with_fixtures.unmagic_fixtures = subs + unmagics
 
-        if isinstance(func, UnmagicFixture):
-            func, scope = func.func, func.scope
+        if is_fixture:
             return fixture(run_with_fixtures, scope=scope)
         return run_with_fixtures
     return apply_fixtures
@@ -117,7 +121,10 @@ class UnmagicFixture:
             if callable(fixture) and not hasattr(type(fixture), "__enter__"):
                 fixture = fixture()
             if not hasattr(type(fixture), "__enter__"):
-                raise ValueError(f"{fixture!r} is not a fixture")
+                raise TypeError(
+                    f"{outer!r} is not a fixture. Hint: expected generator "
+                    "functcion, context manager, or pytest.fixture."
+                )
             if isinstance(fixture, _GeneratorContextManager):
                 # special case for contextmanager
                 inner = wrapped = fixture.func
@@ -193,19 +200,15 @@ class UnmagicFixture:
             scope_node_id = ""
         else:
             scope_node_id = _SCOPE_NODE_ID[self.scope](node.nodeid)
+        assert _api.is_generator(self.func), repr(self)
         _api.register_fixture(
             node.session,
             name=self._id,
-            func=self.get_generator(),
+            func=self.func,
             nodeid=scope_node_id,
             scope=self.scope,
             autouse=self.autouse,
         )
-
-    def get_generator(self):
-        if _api.is_generator(self.func):
-            return self.func
-        return _yield_from(self.func)
 
 
 _SCOPE_NODE_ID = {
@@ -215,16 +218,6 @@ _SCOPE_NODE_ID = {
     "package": lambda n: dirname(n.split("::", 1)[0]),
     "session": lambda n: "",
 }
-
-
-def _yield_from(func):
-    @wraps(func)
-    def fixture_generator(*args, **kw):
-        gen = func(*args, **kw)
-        if not isinstance(gen, GeneratorType):
-            raise TypeError(f"fixture {func.__name__!r} does not yield")
-        yield from gen
-    return fixture_generator
 
 
 class _UnmagicID(str):

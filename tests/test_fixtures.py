@@ -2,10 +2,8 @@ from contextlib import contextmanager
 from unittest.mock import patch
 
 import pytest
-from _pytest.outcomes import Failed
 
 from unmagic import _api, fence, fixture, get_request, use
-from unmagic.fixtures import UnmagicFixture
 
 from .util import get_source, unmagic_tester
 
@@ -88,7 +86,7 @@ def plain_context():
 
 
 def test_plain_contextmanager_fixture():
-    other_fixture = UnmagicFixture.create(plain_context)
+    other_fixture = fixture(plain_context)
     assert other_fixture() == "other"
 
 
@@ -103,23 +101,11 @@ def test_use_magic_fixture():
     assert captured.out == "hello\n"
 
 
-@fixture
-def broken_fix():
-    return "nope"
-
-
 def test_malformed_unmagic_fixture():
-    @broken_fix
-    def test():
-        assert 0, "should not get here"
-
-    with pytest.raises(Failed, match="fixture 'broken_fix' does not yield"):
-        test()
-
-
-def test_malformed_unmagic_fixture_get_value():
-    with pytest.raises(TypeError, match="fixture 'broken_fix' does not yield"):
-        broken_fix()
+    with pytest.raises(TypeError, match=r"<.+broken_fix .*> is not a fixture"):
+        @fixture
+        def broken_fix():
+            return "nope"
 
 
 def test_fixture_is_not_a_test():
@@ -295,7 +281,7 @@ def test_non_function_scoped_contextmanager_fixture():
     @get_source
     def test_py():
         from contextlib import contextmanager
-        from unmagic.fixtures import UnmagicFixture
+        from unmagic import fixture
 
         traces = []
 
@@ -306,7 +292,7 @@ def test_non_function_scoped_contextmanager_fixture():
             traces.append("teardown")
             print("", " ".join(traces))
 
-        @UnmagicFixture.create(context, scope="class")
+        @fixture(context, scope="class")
         class Tests:
             def test_one(self):
                 traces.append("1")
@@ -650,11 +636,11 @@ class TestUnmagicFixtureId:
 
     @fixture
     def one():
-        pass
+        yield
 
     @fixture
     def two():
-        pass
+        yield
 
     def test_str(self):
         assert str(self.one._id) == "one"

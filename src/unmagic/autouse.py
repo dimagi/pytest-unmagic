@@ -52,10 +52,11 @@ def _register_autouse(fixture, where, session):
         if path.name == "__init__.py":
             path = path.parent
         nodeid = _api.bestrelpath(session.config.invocation_params.dir, path)
+    assert _api.is_generator(fixture.func), repr(fixture)
     _api.register_fixture(
         session,
         name=f"{nodeid}::{fixture._id}",
-        func=fixture.get_generator(),
+        func=fixture.func,
         nodeid=nodeid,
         scope=fixture.scope,
         autouse=True,
