@@ -74,6 +74,11 @@ def use(*fixtures):
 
         is_fixture = isinstance(func, UnmagicFixture)
         if is_fixture:
+            if func.autouse:
+                raise TypeError(
+                    f"Cannot apply @use to autouse fixture {func}. "
+                    "Hint: apply @use before @fixture(autouse=...)"
+                )
             func, scope = func.func, func.scope
 
         if _api.is_generator(func):

@@ -108,6 +108,35 @@ def test_autouse_package_fixture():
     result.assert_outcomes(passed=10)
 
 
+def test_use_on_autouse_fixture():
+    @get_source
+    def test_py():
+        import pytest
+        from unmagic import fixture
+
+        traces = []
+
+        @fixture(scope="session")
+        def trace():
+            traces.append("tracing...")
+            yield
+
+        with pytest.raises(TypeError, match="Cannot apply @use to autouse"):
+            @trace
+            @fixture(autouse=True)
+            def use_autouse():
+                traces.append("autoused")
+                yield
+
+        def test():
+            assert traces == ["autoused"]
+
+    pytester = unmagic_tester()
+    pytester.makepyfile(test_py)
+    result = pytester.runpytest("-s")
+    result.assert_outcomes(passed=1)
+
+
 def test_autouse_conftest_fixture():
 
     @get_source
