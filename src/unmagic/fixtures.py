@@ -123,7 +123,11 @@ class UnmagicFixture:
             func.__unmagic_wrapped__ = fixture
         else:
             outer = fixture
-            if callable(fixture) and not hasattr(type(fixture), "__enter__"):
+            if (
+                callable(fixture)
+                and not hasattr(type(fixture), "__enter__")
+                and not hasattr(fixture, "unmagic_fixtures")
+            ):
                 fixture = fixture()
             if not hasattr(type(fixture), "__enter__"):
                 raise TypeError(

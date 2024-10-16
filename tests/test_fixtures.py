@@ -108,6 +108,19 @@ def test_malformed_unmagic_fixture():
             return "nope"
 
 
+def test_malformed_unmagic_fixture_using_other_fixtures():
+    @fixture
+    def do_not_call_me():
+        assert 0, "should not get here"
+        yield
+
+    with pytest.raises(TypeError, match=r"<.+broken_fix .*> is not a fixture"):
+        @fixture
+        @use(do_not_call_me)
+        def broken_fix():
+            return "nope"
+
+
 def test_fixture_is_not_a_test():
     @get_source
     def test_py():
