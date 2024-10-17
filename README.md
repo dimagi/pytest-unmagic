@@ -170,17 +170,19 @@ def test_output():
     assert captured.out == "hello\n"
 ```
 
-### Pytest fixtures can be applied with `@use`
+### `@use` pytest fixtures
+
+Fixtures defined with `@pytest.fixture` can be applied to a test or other
+fixture by passing the fixture name to `@use`. None of the built-in fixtures
+provided by pytest make sense to use this way, but it is a useful technique for
+fixtures that have side effects, such as pytest-django's `db` fixture.
 
 ```py
-from _pytest.capture import capsys
 from unmagic import use
 
-@use(capsys)
-def test_output(capsys):
-    print("world")
-    captured = capsys.readouterr()
-    assert captured.out == "world\n"
+@use("db")
+def test_database():
+    ...
 ```
 
 ## Running the `unmagic` test suite

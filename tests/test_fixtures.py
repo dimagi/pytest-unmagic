@@ -95,7 +95,7 @@ def test_module_is_fenced():
 
 
 def test_use_magic_fixture():
-    cap = get_request().getfixturevalue("capsys")
+    cap = fixture("capsys")()
     print("hello")
     captured = cap.readouterr()
     assert captured.out == "hello\n"
@@ -171,6 +171,36 @@ def test_improper_fixture_dependency():
         "with a class scoped request *"
     ])
     result.assert_outcomes(failed=1)
+
+
+def test_module_fixture_using_session_pytest_fixture():
+    @get_source
+    def test_py():
+        import pytest
+        from unmagic import fixture, use
+
+        traces = []
+
+        @pytest.fixture(scope="session")
+        def tracer():
+            traces.append("session")
+            yield
+
+        @fixture(scope="module")
+        @use("tracer")
+        def class_tracer():
+            traces.append("module")
+            yield
+
+        @class_tracer
+        def test():
+            assert "session" in traces
+            assert "module" in traces
+
+    pytester = unmagic_tester()
+    pytester.makepyfile(test_py)
+    result = pytester.runpytest("-s")
+    result.assert_outcomes(passed=1)
 
 
 @fixture(scope="module")
@@ -584,10 +614,9 @@ class TestFixturesOption:
     def test_use_magic_fixture(self):
         @get_source
         def test_py():
-            from _pytest.capture import capsys
             from unmagic import use
 
-            @use(capsys)
+            @use("capsys")
             def test():
                 pass
 

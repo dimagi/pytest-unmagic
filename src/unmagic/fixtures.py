@@ -27,6 +27,10 @@ def fixture(func=None, /, scope="function", autouse=False):
     teardown. Fixtures may be passed to `@use()` or applied directly as
     a decorator to a test or other fixture.
 
+    This function also accepts context managers and strings as the first
+    argument. A string will create a fixture that looks up the
+    `pytest.fixture` with that name.
+
     A fixture can be assigned a scope. It will be setup for the first
     test that uses it and torn down at the end of its scope.
 
@@ -43,18 +47,11 @@ def fixture(func=None, /, scope="function", autouse=False):
 def use(*fixtures):
     """Apply fixture(s) to a function
 
-    Any context manager may be used as a fixture.
+    Accepted fixture types:
 
-    Magic fixtures may be passed to this decorator. Fixture resolution
-    is done using the ``__name__`` attribute of the magic fixture
-    function, so the actual fixture that is invoked will follow normal
-    pytest fixture resolution rules, which looks first in the test
-    module, then in relevant conftest modules, etc. This means that the
-    fixture that is resolved may be an override of or even unrelated to
-    the one that was passed to ``@use(...)``. In the future this may
-    change to use precisely the passed fixture, so it is safest to pass
-    the most specific fixture possible (the override rather than the
-    overridden fixture).
+        - `unmagic.fixture`
+        - context manager
+        - name of a `pytest.fixture` (`str`)
     """
     if not fixtures:
         raise TypeError("At least one fixture is required")
@@ -115,41 +112,37 @@ class UnmagicFixture:
     def create(cls, fixture, scope="function", autouse=False):
         if isinstance(fixture, cls):
             return fixture
-        if _api.getfixturemarker(fixture) is not None:
-            @wraps(_api.get_real_func(fixture))
-            def func():
-                yield get_request().getfixturevalue(fixture.__name__)
-            func.__pytest_wrapped__ = fixture.__pytest_wrapped__
-            func.__unmagic_wrapped__ = fixture
-        else:
-            outer = fixture
-            if (
-                callable(fixture)
-                and not hasattr(type(fixture), "__enter__")
-                and not hasattr(fixture, "unmagic_fixtures")
-            ):
-                fixture = fixture()
-            if not hasattr(type(fixture), "__enter__"):
-                raise TypeError(
-                    f"{outer!r} is not a fixture. Hint: expected generator "
-                    "functcion, context manager, or pytest.fixture."
-                )
-            if isinstance(fixture, _GeneratorContextManager):
-                # special case for contextmanager
-                inner = wrapped = fixture.func
-            else:
-                if isinstance(fixture, mock._patch):
-                    inner = _pretty_patch(fixture)
-                else:
-                    inner = type(fixture)
-                wrapped = inner.__enter__  # must be a function
+        if isinstance(fixture, str):
+            return PytestFixture(fixture, scope, autouse)
 
-            @wraps(inner)
-            def func():
-                with fixture as value:
-                    yield value
-            func.__pytest_wrapped__ = _api.Wrapper(wrapped)
-            func.__unmagic_wrapped__ = outer
+        outer = fixture
+        if (
+            callable(fixture)
+            and not hasattr(type(fixture), "__enter__")
+            and not hasattr(fixture, "unmagic_fixtures")
+        ):
+            fixture = fixture()
+        if not hasattr(type(fixture), "__enter__"):
+            raise TypeError(
+                f"{outer!r} is not a fixture. Hint: expected generator "
+                "functcion, context manager, or pytest.fixture name."
+            )
+        if isinstance(fixture, _GeneratorContextManager):
+            # special case for contextmanager
+            inner = wrapped = fixture.func
+        else:
+            if isinstance(fixture, mock._patch):
+                inner = _pretty_patch(fixture)
+            else:
+                inner = type(fixture)
+            wrapped = inner.__enter__  # must be a function
+
+        @wraps(inner)
+        def func():
+            with fixture as value:
+                yield value
+        func.__pytest_wrapped__ = _api.Wrapper(wrapped)
+        func.__unmagic_wrapped__ = outer
         # delete __wrapped__ to prevent pytest from
         # introspecting arguments from wrapped function
         del func.__wrapped__
@@ -218,6 +211,30 @@ class UnmagicFixture:
             scope=self.scope,
             autouse=self.autouse,
         )
+
+
+class PytestFixture(UnmagicFixture):
+
+    def __init__(self, name, scope, autouse):
+        if autouse:
+            raise ValueError(f"Cannot autouse pytest.fixture: {name!r}")
+        if scope != "function":
+            raise ValueError(f"Cannot set scope of pytest.fixture: {name!r}")
+
+        def func():
+            assert 0, "should not get here"
+        func.__name__ = self._id = name
+        func.__doc__ = f"Unmagic-wrapped pytest.fixture: {name!r}"
+        super().__init__(func, None, None)
+
+    def _get_value(self):
+        return get_request().getfixturevalue(self._id)
+
+    def _is_registered_for(self, node):
+        return True
+
+    def _register(self, node):
+        raise NotImplementedError
 
 
 _SCOPE_NODE_ID = {
