@@ -201,7 +201,7 @@ def test_autouse_plugin_fixture():
             ss_tracer().append("t2")
 
     pytester = unmagic_tester()
-    pytester.makeini('[pytest]\npythonpath = .\n')
+    pytester.syspathinsert(pytester.path)
     pytester.makepyfile(plug=plug_py, test_it=test_py)
 
     result = pytester.runpytest("-s", "-pplug")
