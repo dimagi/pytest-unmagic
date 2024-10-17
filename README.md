@@ -35,7 +35,8 @@ set up and registered for tear down, but does not pass the yielded value to the
 decorated function. This is appropriate for fixtures that have side effects.
 
 The location where a fixture is defined has no affect on where it can be used.
-Any code that can import it can use it.
+Any code that can import it can use it as long as it is executed in the context
+of running tests and does not violate scope restrictions.
 
 ### @use shorthand
 
