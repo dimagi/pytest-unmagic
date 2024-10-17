@@ -1,0 +1,28 @@
+name: pytest-unmagic tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.9', '3.10', '3.11', '3.12', '3.13']
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+    - name: Setup
+      run: |
+        python --version
+        pip install --upgrade pip flake8
+        pip install -e .
+    - name: Run tests
+      run: pytest
+    - name: Check style
+      run: flake8 src/unmagic/ tests/
