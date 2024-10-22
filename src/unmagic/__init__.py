@@ -1,4 +1,4 @@
-"""Reduce pytest magic
+"""Pytest fixtures with conventional import semantics
 
 The primary motivation of this project is to remove the argument-name-
 matching magic in pytest fixtures.
