@@ -186,6 +186,32 @@ def test_database():
     ...
 ```
 
+### Chaining fixtures
+
+Fixtures that use other fixtures should be decorated with `@use`, so
+that fixture dependencies are chained.
+
+```python
+@use("db")
+def parent_fixture():
+    daedalus = Person.objects.create(name='Daedalus')
+    yield daedalus
+    daedalus.delete()
+
+@use(parent_fixture)
+@fixture
+def child_fixture():
+    daedalus = parent_fixture()
+    icarus = Person.objects.create(name='Icarus', father=daedalus)
+    yield
+
+@use(child_fixture)
+def test_flight():
+    flyers = Person.objects.all()
+    ...
+```
+
+
 ## Running the `unmagic` test suite
 
 ```sh
