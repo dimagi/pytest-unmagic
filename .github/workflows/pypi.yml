@@ -7,6 +7,7 @@ on:
       - main
     tags:
       - 'v*'
+  workflow_dispatch:
 jobs:
   build:
     name: Build distribution package
@@ -17,10 +18,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-      - run: pip install build
+      - run: pip install build pyverno
       - name: Add untagged version suffix
         if: ${{ ! startsWith(github.ref, 'refs/tags/v') }}
-        run: python version.py update
+        run: python -m pyverno update src/unmagic/__init__.py
       - name: Build a binary wheel and a source tarball
         run: python -m build
       - name: Store the distribution packages
@@ -39,9 +40,9 @@ jobs:
         with:
           python-version: "3.x"
       - name: Install pytest-unmagic
-        run: pip install -e .
+        run: pip install pyverno -e .
       - name: Check version
-        run: python version.py check "${{ github.ref }}"
+        run: python -m pyverno check src/unmagic/__init__.py "${{ github.ref }}"
   pypi-publish:
     name: Upload release to PyPI
     needs: [build, version-check]
