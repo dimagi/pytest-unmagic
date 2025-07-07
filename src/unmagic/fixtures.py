@@ -7,6 +7,7 @@ PYTEST_DONT_REWRITE
 """
 from contextlib import _GeneratorContextManager
 from functools import cached_property, wraps
+from inspect import isgeneratorfunction
 from os.path import dirname
 from unittest import mock
 
@@ -38,7 +39,7 @@ def fixture(func=None, /, scope="function", autouse=False):
     a lower scope to retrieve the value of the fixture.
     """
     def fixture(func):
-        if not _api.is_generator(func):
+        if not isgeneratorfunction(func):
             return UnmagicFixture.create(func, scope, autouse)
         return UnmagicFixture(func, scope, autouse)
     return fixture if func is None else fixture(func)
@@ -78,7 +79,7 @@ def use(*fixtures):
                 )
             func, scope = func.func, func.scope
 
-        if _api.is_generator(func):
+        if isgeneratorfunction(func):
             @wraps(func)
             def run_with_fixtures(*args, **kw):
                 setup_fixtures()
@@ -202,7 +203,7 @@ class UnmagicFixture:
             scope_node_id = ""
         else:
             scope_node_id = _SCOPE_NODE_ID[self.scope](node.nodeid)
-        assert _api.is_generator(self.func), repr(self)
+        assert isgeneratorfunction(self.func), repr(self)
         _api.register_fixture(
             node.session,
             name=self._id,

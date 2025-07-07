@@ -1,7 +1,6 @@
 # flake8: noqa: F401
 from _pytest.compat import (
     get_real_func,
-    is_generator,
     safe_getattr,
     safe_isclass,
     _PytestWrapper as Wrapper,
