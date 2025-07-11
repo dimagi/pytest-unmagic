@@ -7,7 +7,7 @@ PYTEST_DONT_REWRITE
 """
 from contextlib import _GeneratorContextManager
 from functools import cached_property, wraps
-from inspect import isgeneratorfunction
+from inspect import isgeneratorfunction, Signature
 from os.path import dirname
 from unittest import mock
 
@@ -142,11 +142,10 @@ class UnmagicFixture:
         def func():
             with fixture as value:
                 yield value
-        func.__pytest_wrapped__ = _api.Wrapper(wrapped)
         func.__unmagic_wrapped__ = outer
-        # delete __wrapped__ to prevent pytest from
-        # introspecting arguments from wrapped function
-        del func.__wrapped__
+        func.__wrapped__ = wrapped
+        # prevent pytest from introspecting arguments from wrapped function
+        func.__signature__ = Signature()
         return cls(func, scope, autouse)
 
     def __init__(self, func, scope, autouse):
@@ -163,11 +162,6 @@ class UnmagicFixture:
     @property
     def unmagic_fixtures(self):
         return self.func.unmagic_fixtures
-
-    @property
-    def __pytest_wrapped__(self):
-        wrapped = getattr(self.func, "__pytest_wrapped__", None)
-        return _api.Wrapper(self.func) if wrapped is None else wrapped
 
     @property
     def __name__(self):

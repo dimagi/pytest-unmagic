@@ -3,7 +3,6 @@ from _pytest.compat import (
     get_real_func,
     safe_getattr,
     safe_isclass,
-    _PytestWrapper as Wrapper,
 )
 from _pytest.fixtures import (
     _get_direct_parametrize_args as get_direct_parametrize_args,
