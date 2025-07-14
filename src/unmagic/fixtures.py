@@ -7,6 +7,7 @@ PYTEST_DONT_REWRITE
 """
 from contextlib import _GeneratorContextManager
 from functools import cached_property, wraps
+from inspect import isgeneratorfunction, Signature
 from os.path import dirname
 from unittest import mock
 
@@ -38,7 +39,7 @@ def fixture(func=None, /, scope="function", autouse=False):
     a lower scope to retrieve the value of the fixture.
     """
     def fixture(func):
-        if not _api.is_generator(func):
+        if not isgeneratorfunction(func):
             return UnmagicFixture.create(func, scope, autouse)
         return UnmagicFixture(func, scope, autouse)
     return fixture if func is None else fixture(func)
@@ -78,7 +79,7 @@ def use(*fixtures):
                 )
             func, scope = func.func, func.scope
 
-        if _api.is_generator(func):
+        if isgeneratorfunction(func):
             @wraps(func)
             def run_with_fixtures(*args, **kw):
                 setup_fixtures()
@@ -141,11 +142,10 @@ class UnmagicFixture:
         def func():
             with fixture as value:
                 yield value
-        func.__pytest_wrapped__ = _api.Wrapper(wrapped)
         func.__unmagic_wrapped__ = outer
-        # delete __wrapped__ to prevent pytest from
-        # introspecting arguments from wrapped function
-        del func.__wrapped__
+        func.__wrapped__ = wrapped
+        # prevent pytest from introspecting arguments from wrapped function
+        func.__signature__ = Signature()
         return cls(func, scope, autouse)
 
     def __init__(self, func, scope, autouse):
@@ -162,11 +162,6 @@ class UnmagicFixture:
     @property
     def unmagic_fixtures(self):
         return self.func.unmagic_fixtures
-
-    @property
-    def __pytest_wrapped__(self):
-        wrapped = getattr(self.func, "__pytest_wrapped__", None)
-        return _api.Wrapper(self.func) if wrapped is None else wrapped
 
     @property
     def __name__(self):
@@ -202,7 +197,7 @@ class UnmagicFixture:
             scope_node_id = ""
         else:
             scope_node_id = _SCOPE_NODE_ID[self.scope](node.nodeid)
-        assert _api.is_generator(self.func), repr(self)
+        assert isgeneratorfunction(self.func), repr(self)
         _api.register_fixture(
             node.session,
             name=self._id,

@@ -1,9 +1,10 @@
 from contextlib import contextmanager
+from inspect import isgeneratorfunction
 from unittest.mock import patch
 
 import pytest
 
-from unmagic import _api, fence, fixture, get_request, use
+from unmagic import fence, fixture, get_request, use
 
 from .util import get_source, unmagic_tester
 
@@ -57,7 +58,7 @@ def test_use_generator_should_return_generator():
     @fix
     def gen():
         yield
-    assert _api.is_generator(gen)
+    assert isgeneratorfunction(gen)
 
 
 class Thing:
