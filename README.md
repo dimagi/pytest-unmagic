@@ -26,8 +26,8 @@ def test_query(db):
 
 **pytest-unmagic** (explicit):
 
+fixtures.py
 ```python
-# fixtures.py
 from unmagic import fixture
 
 @fixture
