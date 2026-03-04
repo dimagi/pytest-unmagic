@@ -188,7 +188,7 @@ def test_models():
 
 ### Magic fixture fence
 
-Warn when implicit fixtures are used in specified modules:
+Warn when magic fixtures are used in specified modules:
 
 ```python
 from unmagic import fence
