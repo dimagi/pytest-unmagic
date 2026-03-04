@@ -383,7 +383,7 @@ pytest test_pytest_interop.py test_use_pytest.py -v
 
 ## Lesson 9: The Fence Feature
 
-The fence warns you when tests use "magic" (implicit) pytest fixtures,
+The fence warns you when tests use magic pytest fixtures,
 helping enforce explicit fixture usage.
 
 Create `conftest.py`:
