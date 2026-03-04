@@ -1,7 +1,7 @@
 # How to: Use the Magic Fixture Fence
 
 **Problem:** You want to enforce explicit fixture usage and get warnings
-when tests use implicit (magic) pytest fixtures.
+when tests use magic pytest fixtures.
 
 ## Solution
 
