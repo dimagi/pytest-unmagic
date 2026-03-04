@@ -82,7 +82,7 @@ def test_greeting():
 
 - **Fixture scopes:** `function`, `class`, `module`, `package`, `session`
 
-- **Magic fence:** Warn when implicit fixtures are used in designated
+- **Magic fence:** Warn when magic fixtures are used in designated
   modules
 
 ## Core Concepts
