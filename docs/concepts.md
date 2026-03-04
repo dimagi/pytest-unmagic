@@ -197,7 +197,7 @@ fixtures (like `db` from pytest-django) via `@use("name")` or
 
 ## The Fence
 
-The fence feature supports gradual migration by warning about implicit
+The fence feature supports gradual migration by warning about magic
 fixture usage:
 
 ```python
