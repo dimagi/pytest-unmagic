@@ -5,7 +5,7 @@
 **Source:** [GitHub](https://github.com/dimagi/pytest-unmagic)
 **Package:** [PyPI](https://pypi.org/project/pytest-unmagic/)
 
-pytest-unmagic replaces pytest's implicit fixture injection with
+pytest-unmagic replaces pytest's magic fixture injection with
 conventional Python imports. Fixtures are explicitly imported, applied
 with decorators, and called to retrieve values -- no name-matching
 magic.
