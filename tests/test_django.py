@@ -134,3 +134,26 @@ def test_declared_db_does_not_trip_runtime_guard():
     """))
     result = tester.runpytest("-q")
     result.assert_outcomes(passed=1)
+
+
+def test_no_django_means_no_injection_and_no_guard():
+    """Run a sub-pytest with pytest-django disabled. A test using
+    @use('some_pytest_fixture') should still work; the unmagic bridge
+    must not interfere when pytest-django is absent."""
+    with patch.object(_pytester, "main", unmagic_inactive()(_pytester.main)):
+        request = get_request()
+        pytester = request.getfixturevalue("pytester")
+        pytester.makepyfile(textwrap.dedent("""
+            import pytest
+            from unmagic import use
+
+            @pytest.fixture
+            def greeting():
+                return 'hi'
+
+            @use('greeting')
+            def test_greeting():
+                pass
+        """))
+        result = pytester.runpytest("-q", "-p", "no:django")
+        result.assert_outcomes(passed=1)
