@@ -223,7 +223,9 @@ class PytestFixture(UnmagicFixture):
         super().__init__(func, None, None)
 
     def _get_value(self):
-        return get_request().getfixturevalue(self._id)
+        request = get_request()
+        _django.guard_pytest_fixture_access(self._id, request)
+        return request.getfixturevalue(self._id)
 
     def _is_registered_for(self, node):
         return True
