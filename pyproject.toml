@@ -22,6 +22,11 @@ dependencies = [
     "pytest",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest-django>=4.12",
+    "django>=4.2,<6",
+]
 
 [project.entry-points.pytest11]
 unmagic = "unmagic"

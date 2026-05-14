@@ -24,7 +24,7 @@ jobs:
         python --version
         pip install --upgrade pip flake8
         pip install pytest~=${{ matrix.pytest }}.0
-        pip install -e .
+        pip install -e .[test]
     - name: Run tests
       run: pytest
     - name: Check style
