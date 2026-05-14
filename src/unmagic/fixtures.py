@@ -13,7 +13,7 @@ from unittest import mock
 
 import pytest
 
-from . import _api
+from . import _api, _django
 from .autouse import autouse as _autouse
 from .scope import get_request
 
@@ -288,3 +288,4 @@ def pytest_itemcollected(item):
         for fixture in fixtures:
             if not fixture._is_registered_for(item):
                 fixture._register(item)
+        _django.inject_fixturenames(item, fixtures)
