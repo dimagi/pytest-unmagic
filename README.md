@@ -2,6 +2,18 @@
 
 Pytest fixtures with conventional import semantics.
 
+pytest's fixtures are powerful, but they rely on "magic": a test requests a
+fixture by adding an argument whose name matches the fixture, and pytest
+resolves it at runtime by searching `conftest.py` files and plugins. Where a
+fixture comes from is not visible in the code, "go to definition" does not work,
+and fixtures cannot be applied to `unittest.TestCase` tests.
+
+pytest-unmagic applies the principle that explicit is better than implicit:
+fixtures are imported, applied with a decorator, and called like ordinary Python
+objects. Every dependency is visible and easy to navigate. Unmagic fixtures
+coexist with standard pytest fixtures, so a project can adopt them gradually, one
+fixture at a time.
+
 ## Installation
 
 ```sh
@@ -36,7 +48,8 @@ decorated function. This is appropriate for fixtures that have side effects.
 
 The location where a fixture is defined has no affect on where it can be used.
 Any code that can import it can use it as long as it is executed in the context
-of running tests and does not violate scope restrictions.
+of running tests and does not violate [scope](docs/reference.md#fixture-scope)
+restrictions.
 
 ### @use shorthand
 
@@ -68,3 +81,18 @@ def test_append():
     traces.append("hello")
     assert traces, "expected at least one trace"
 ```
+
+## Learn more
+
+The [reference guide](docs/reference.md) documents the rest of unmagic's
+features in detail, including:
+
+- Applying fixtures to test classes and `unittest.TestCase` tests
+- Fixture scopes and teardown
+- Autouse fixtures
+- Accessing pytest's request object and reusing `@pytest.fixture` fixtures
+- Chaining fixtures that depend on other fixtures
+- Erecting a fence to flag remaining magic-fixture usage
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to run the test suite and publish
+a new release.
