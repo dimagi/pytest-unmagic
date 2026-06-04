@@ -322,7 +322,7 @@ or packages.
 
 | Parameter | Type              | Default | Description                                                       |
 |-----------|-------------------|---------|-------------------------------------------------------------------|
-| `names`   | sequence of `str` | `()`    | Module or package names to fence.                                 |
+| `names`   | sequence of `str` | `()`    | Module or package names to fence. An empty string (`''`) matches modules that are not in a package. |
 | `reset`   | `bool`            | `False` | If `True`, replace all existing fences instead of adding to them. |
 
 **Returns:** a context manager. The fence is removed when the context exits.
