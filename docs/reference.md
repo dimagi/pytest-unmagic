@@ -361,21 +361,21 @@ namespace.
 
 An `UnmagicFixture` instance is callable with two behaviors:
 
-- **`fixture()`** (no arguments): retrieves the fixture's yielded value. The
+- **`my_fixture()`** (no arguments): retrieves the fixture's yielded value. The
   fixture is set up if it hasn't been already. Must be called within a test or
   fixture context.
 
-- **`fixture(func)`** (one argument): applies the fixture to `func`, equivalent
+- **`my_fixture(func)`** (one argument): applies the fixture to `func`, equivalent
   to `@use(fixture)`. This is the `@use` shorthand.
 
 ```py
 @fixture
-def db():
+def my_fixture():
     yield create_database()
 
 # Shorthand: apply as a decorator
-@db
+@my_fixture
 def test_something():
-    database = db()  # retrieve the value
+    database = my_fixture()  # retrieve the value
     ...
 ```
