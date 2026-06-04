@@ -36,6 +36,17 @@ def test_new_fence_does_not_remove_previously_installed_fence():
     assert not fence.is_fenced(func)
 
 
+def test_module_with_no_package_is_fenced():
+    def func():
+        ...
+
+    func.__module__ = "test_something"
+
+    with fence.install(['']):
+        assert fence.is_fenced(func)
+    assert not fence.is_fenced(func)
+
+
 def func():
     ...
 
