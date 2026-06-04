@@ -10,7 +10,7 @@ jobs:
   configure:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Read Python versions from pyproject.toml
       id: read-versions
       # produces output like: python_versions=[ "3.10", "3.11", "3.12", "3.13", "3.14" ]
@@ -33,7 +33,7 @@ jobs:
         python: ${{ fromJSON(needs.configure.outputs.python_versions) }}
         pytest: ['8.1', '8.2', '8.3', '8.4', '9.0']
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: astral-sh/setup-uv@v7
       with:
         version: '>=0.7'
