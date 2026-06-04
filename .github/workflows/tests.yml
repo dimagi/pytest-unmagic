@@ -34,16 +34,15 @@ jobs:
         pytest: ['8.1', '8.2', '8.3', '8.4', '9.0']
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
+    - uses: astral-sh/setup-uv@v7
       with:
+        version: '>=0.7'
         python-version: ${{ matrix.python }}
     - name: Setup
       run: |
-        python --version
-        pip install --upgrade pip flake8
-        pip install pytest~=${{ matrix.pytest }}.0
-        pip install -e .
+        uv venv --python=${{ matrix.python }}
+        uv pip install flake8 pytest~=${{ matrix.pytest }}.0 --editable .
     - name: Run tests
-      run: pytest
+      run: .venv/bin/pytest
     - name: Check style
-      run: flake8 src/unmagic/ tests/
+      run: .venv/bin/flake8 src/unmagic/ tests/
