@@ -141,16 +141,6 @@ def test_flight():
     ...
 ```
 
-When applying `@use` to a fixture, place `@use` *above* `@fixture`:
-
-```py
-# Correct order:
-@use(dependency)
-@fixture
-def my_fixture():
-    yield
-```
-
 `@use` cannot wrap an autouse fixture. To combine the two, apply
 `@fixture(autouse=...)` as the outermost decorator:
 
@@ -300,9 +290,6 @@ Apply one or more fixtures to a test function, test class, or another fixture.
 **Returns:** a decorator function.
 
 **Raises:** `TypeError` if no fixtures are provided.
-
-When applying `@use` to a fixture, place it above `@fixture` (see
-[Chaining fixtures](#chaining-fixtures)).
 
 ### `get_request`
 
