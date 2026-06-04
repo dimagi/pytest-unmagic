@@ -12,6 +12,10 @@ def install(names=(), reset=False):
 
     Warn if pytest magic fixtures are used within the named
     modules/packages.
+
+    :param names: A sequence of package names. An empty string
+    matches modules that are not in a package.
+    :param reset: Reset the fence, ignoring previously fenced names.
     """
     if isinstance(names, str):
         raise ValueError("names should be a sequence of strings, not a string")
@@ -62,6 +66,8 @@ def _uninstall(fence):
 def is_fenced(func):
     fence = _fences[-1]
     mod = func.__module__
+    if "." not in mod and '' in fence:
+        return True
     while mod not in fence:
         if "." not in mod or not fence:
             return False
