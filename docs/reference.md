@@ -221,19 +221,6 @@ This will cause warnings to be emitted for magic fixture usages within
 migration: the warnings show which tests and fixtures still rely on name-matching
 magic, and they decrease as the fence's namespace is migrated.
 
-`fence.install()` returns a context manager, so a fence may instead be installed
-for the duration of a block or a pytest session:
-
-```py
-from pytest import fixture as pytest_fixture
-from unmagic import fence
-
-@pytest_fixture(scope="session", autouse=True)
-def enforce_unmagic():
-    with fence.install(["tests"]):
-        yield
-```
-
 Fences stack: each `fence.install()` adds to the set of fenced modules, and
 inner fences are removed when their context exits while outer fences remain. Pass
 `reset=True` to replace all existing fences instead of adding to them. Use
