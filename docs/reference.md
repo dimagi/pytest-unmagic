@@ -354,7 +354,7 @@ Check whether a function is within a fenced module.
 |-----------|----------|----------------------------------------------------------------------|
 | `func`    | callable | A function to check. Uses `func.__module__` to determine membership. |
 
-**Returns:** `bool` -- `True` if the function's module is within a fenced
+**Returns:** `bool` — `True` if the function's module is within a fenced
 namespace.
 
 ### Fixture calling convention
